@@ -15,5 +15,5 @@ class Event {
     required this.price,
     required this.imagePath,
     required this.category,
-});
+  });
 }
