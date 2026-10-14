@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/screens/main_shell.dart';
+import 'package:mobile/features/profile/ui/profile_screen.dart';
 
 void main() {
   runApp(const MyApp());
