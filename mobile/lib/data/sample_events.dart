@@ -46,4 +46,21 @@ const sampleEvents = [
     imagePath: 'assets/images/Bonanza.jpg',
     category: 'Sports',
   ),
+  Event(
+    title: 'AfroFusion Live 2026',
+    date: 'Saturday, 21 November 2026',
+    time: '6:00 PM',
+    endTime: '11:30 PM',
+    venue: 'Comesa Hall, Blantyre',
+    price: 15000,
+    imagePath: 'assets/images/Concert.jpg',
+    category: 'Concerts',
+    genre: 'Music & Entertainment',
+    ticketTypes: [
+      TicketType(name: 'Standard Ticket', price: 15000),
+      TicketType(name: 'VIP Ticket', price: 30000),
+    ],
+    capacity: 300,
+    status: 'Available',
+  ),
 ];

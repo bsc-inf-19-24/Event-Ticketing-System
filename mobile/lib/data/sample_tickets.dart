@@ -5,10 +5,14 @@ const sampleTickets = [
   Ticket(
     id: 'TKT-001',
     eventName: 'Blantyre Football Cup',
-    date: '5 Dec 2026, 3.00 PM',
+    date: '5 Dec 2026, 3:00 PM',
     venue: 'Kamuzu Stadium',
     status: 'Confirmed',
     qrData: 'TICKET-TKT-001-FOOTBALL-CUP',
+    ticketType: 'Standard',
+    price: 15000,
+    purchasedOn: '10 Nov 2026',
+    imagePath: 'assets/images/football.jpg',
   ),
   Ticket(
     id: 'TKT-002',
@@ -17,6 +21,10 @@ const sampleTickets = [
     venue: 'BICC',
     status: 'Confirmed',
     qrData: 'TICKET-TKT-002-ZAMUSIC-FESTIVAL',
+    ticketType: 'General Admission',
+    price: 25000,
+    purchasedOn: '12 Nov 2026',
+    imagePath: 'assets/images/Festival.jpg',
   ),
   Ticket(
     id: 'TKT-003',
@@ -25,6 +33,10 @@ const sampleTickets = [
     venue: 'Bingu National Stadium',
     status: 'Confirmed',
     qrData: 'TICKET-TKT-003-DRAMA-FESTIVAL',
+    ticketType: 'Standard',
+    price: 10000,
+    purchasedOn: '15 Nov 2026',
+    imagePath: 'assets/images/drama.jpg',
   ),
   Ticket(
     id: 'TKT-004',
@@ -33,6 +45,10 @@ const sampleTickets = [
     venue: 'Botanic Garden',
     status: 'Confirmed',
     qrData: 'TICKET-TKT-004-BOTANIC-WORKSHOP',
+    ticketType: 'Workshop Pass',
+    price: 12000,
+    purchasedOn: '18 Oct 2026',
+    imagePath: 'assets/images/workshop.jpg',
   ),
   Ticket(
     id: 'TKT-005',
@@ -41,5 +57,9 @@ const sampleTickets = [
     venue: 'Cival Stadium',
     status: 'Confirmed',
     qrData: 'TICKET-TKT-005-BONANZA-LEAGUE',
+    ticketType: 'Standard',
+    price: 8000,
+    purchasedOn: '20 Nov 2026',
+    imagePath: 'assets/images/Bonanza.jpg',
   ),
 ];

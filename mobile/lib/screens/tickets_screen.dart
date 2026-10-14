@@ -47,32 +47,29 @@ class _TicketsScreenState extends State<TicketsScreen> {
     }
   }
 
-  Future<void> _saveTicket(Ticket ticket) async {
+  Future<bool> _saveTicket(Ticket ticket) async {
     try {
       await _storage.saveTicket(ticket);
       await _loadSavedTickets();
 
-      if (!mounted) return;
+      if (!mounted) return true;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ticket saved on this device.'),
-        ),
+        const SnackBar(content: Text('Ticket saved on this device.')),
       );
+      return true;
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) return false;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not save ticket.'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Could not save ticket.')));
+      return false;
     }
   }
 
   void _openTicket(Ticket ticket) {
-    final isSaved =
-    _savedTickets.any((saved) => saved.id == ticket.id);
+    final isSaved = _savedTickets.any((saved) => saved.id == ticket.id);
 
     Navigator.push(
       context,
@@ -80,6 +77,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
         builder: (_) => TicketDetailsScreen(
           ticket: ticket,
           isSaved: isSaved,
+          onDownload: _saveTicket,
         ),
       ),
     );
@@ -87,134 +85,205 @@ class _TicketsScreenState extends State<TicketsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final savedIds =
-    _savedTickets.map((ticket) => ticket.id).toSet();
+    final savedIds = _savedTickets.map((ticket) => ticket.id).toSet();
+    final ticketsById = {for (final ticket in sampleTickets) ticket.id: ticket};
+    for (final ticket in _savedTickets) {
+      ticketsById[ticket.id] = ticket;
+    }
+    final tickets = ticketsById.values.toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('My Tickets'),
+        centerTitle: true,
+        automaticallyImplyLeading: false,
+        backgroundColor: AppColors.background,
+        foregroundColor: Colors.white,
+        titleTextStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+        ),
       ),
       body: _loading
-          ? const Center(
-        child: CircularProgressIndicator(),
-      )
+          ? const Center(child: CircularProgressIndicator())
           : _error != null
           ? Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(_error!),
-            ElevatedButton(
-              onPressed: _loadSavedTickets,
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
-      )
-          : ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Text(
-            'DEMO MODE — SAMPLE TICKETS ONLY',
-            style: TextStyle(
-              color: Colors.orange,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          Text(
-            'Available Tickets',
-            style: Theme.of(context)
-                .textTheme.titleLarge
-                ?.copyWith(color: Colors.white),
-          ),
-          const SizedBox(height: 12),
-
-          ...sampleTickets.map((ticket) {
-            final isSaved = savedIds.contains(ticket.id);
-
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      ticket.eventName,
-                      style: Theme.of(context)
-                          .textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    Text('Ticket ID: ${ticket.id}'),
-                    Text('Date: ${ticket.date}'),
-                    Text('Venue: ${ticket.venue}'),
-                    Text('Status: ${ticket.status}'),
-                    const SizedBox(height: 8),
-
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        TextButton(
-                          onPressed: () =>
-                              _openTicket(ticket),
-                          child: const Text('View details'),
-                        ),
-                        ElevatedButton.icon(
-                          onPressed: isSaved
-                              ? null
-                              : () => _saveTicket(ticket),
-                          icon: Icon(
-                            isSaved
-                                ? Icons.check
-                                : Icons.download,
-                          ),
-                          label: Text(
-                            isSaved ? 'Saved' : 'Save offline',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_error!),
+                  ElevatedButton(
+                    onPressed: _loadSavedTickets,
+                    child: const Text('Retry'),
+                  ),
+                ],
               ),
-            );
-          }),
-
-          const Divider(height: 32),
-
-          Text(
-            'Saved Offline (${_savedTickets.length})',
-            style: Theme.of(context)
-                .textTheme.titleLarge
-                ?.copyWith(color: Colors.white),
-          ),
-
-          if (_savedTickets.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Text(
-                'No tickets saved yet.',
-                style: TextStyle(color: Colors.white70),
+            )
+          : tickets.isEmpty
+          ? const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.confirmation_number_outlined,
+                    color: Colors.white70,
+                    size: 48,
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    'You have no tickets yet',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ],
               ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: tickets.length,
+              itemBuilder: (context, index) {
+                final ticket = tickets[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _TicketCard(
+                    ticket: ticket,
+                    isSaved: savedIds.contains(ticket.id),
+                    onTap: () => _openTicket(ticket),
+                  ),
+                );
+              },
             ),
-
-          ..._savedTickets.map(
-                (ticket) => Card(
-              child: ListTile(
-                leading: const Icon(Icons.offline_pin),
-                title: Text(ticket.eventName),
-                subtitle: Text('Ticket ID: ${ticket.id}'),
-                onTap: () => _openTicket(ticket),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
 
+class _TicketCard extends StatelessWidget {
+  final Ticket ticket;
+  final bool isSaved;
+  final VoidCallback onTap;
+
+  const _TicketCard({
+    required this.ticket,
+    required this.isSaved,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final imageWidth = constraints.maxWidth * 0.4;
+
+        return Container(
+          height: 190,
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.black),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onTap,
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: imageWidth,
+                      height: 190,
+                      child: ticket.imagePath.isEmpty
+                          ? const ColoredBox(
+                              color: AppColors.card,
+                              child: Icon(
+                                Icons.image_outlined,
+                                color: Colors.white70,
+                                size: 36,
+                              ),
+                            )
+                          : Image.asset(ticket.imagePath, fit: BoxFit.cover),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _TicketText(
+                              ticket.eventName,
+                              style: const TextStyle(
+                                color: AppColors.textDark,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            _TicketText('Ticket ID: ${ticket.id}'),
+                            _TicketText(ticket.date),
+                            _TicketText(ticket.venue),
+                            _TicketText('Status: ${ticket.status}'),
+                            if (isSaved)
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.check_circle,
+                                        color: Colors.white,
+                                        size: 14,
+                                      ),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Saved offline',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _TicketText extends StatelessWidget {
+  final String text;
+  final TextStyle? style;
+
+  const _TicketText(this.text, {this.style});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: style ?? const TextStyle(color: AppColors.textDark),
+    );
+  }
+}

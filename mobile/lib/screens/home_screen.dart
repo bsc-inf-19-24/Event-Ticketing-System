@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'event_details_screen.dart';
 import '../data/sample_events.dart';
 import '../models/event.dart';
 import '../theme/app_colors.dart';
@@ -192,7 +193,20 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       itemCount: events.length,
       separatorBuilder: (context, index) => const SizedBox(height: 16),
-      itemBuilder: (context, index) => EventCard(event: events[index]),
+      itemBuilder: (context, index) {
+        final event = events[index];
+        return EventCard(
+          event: event,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => EventDetailsScreen(event: event),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
