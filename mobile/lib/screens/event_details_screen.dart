@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/event.dart';
 import '../theme/app_colors.dart';
 import '../utils/format.dart';
+import '../utils/auth_guard.dart';
 
 class EventDetailsScreen extends StatelessWidget {
   final Event event;
@@ -50,13 +51,9 @@ class EventDetailsScreen extends StatelessWidget {
                     shape: const StadiumBorder(),
                   ),
                   onPressed: canBuy
-                      ? () {
-                          // TODO: open the purchase screen
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Purchase screen coming soon'),
-                            ),
-                          );
+                      ? () async {
+                          final allowed = await requireLogin(context);
+                          if (!allowed || !context.mounted) return;
                         }
                       : null,
                   child: Text(canBuy ? 'Buy Ticket' : 'Not available'),
