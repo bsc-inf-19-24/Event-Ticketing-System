@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:mobile/theme/app_colors.dart';
-import 'package:mobile/features/auth/logic/auth_controller.dart';
-import 'package:mobile/widgets/login_required_view.dart';
 
 import 'widgets/profile_header_card.dart';
 import 'widgets/profile_menu_item.dart';
@@ -13,13 +10,6 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     // Soft blue background color extracted from your prototype mockup
     const backgroundColor = Color(0xFFB5D1E4);
-
-    if (!authController.isLoggedIn) {
-      return const Scaffold(
-        backgroundColor: AppColors.background,
-        body: LoginRequiredView(message: 'Log in to view profile'),
-      );
-    }
 
     return Scaffold(
       backgroundColor: backgroundColor,

@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../features/auth/logic/auth_controller.dart';
 import '../theme/app_colors.dart';
 import '../models/ticket.dart';
 import '../data/sample_tickets.dart';
 import '../services/ticket_storage.dart';
 import 'ticket_details_screen.dart';
-import '../widgets/login_required_view.dart';
 
 class TicketsScreen extends StatefulWidget {
   const TicketsScreen({super.key});
@@ -93,13 +91,6 @@ class _TicketsScreenState extends State<TicketsScreen> {
       ticketsById[ticket.id] = ticket;
     }
     final tickets = ticketsById.values.toList();
-
-    if (!authController.isLoggedIn) {
-      return const Scaffold(
-        backgroundColor: AppColors.background,
-        body: LoginRequiredView(message: 'Log in to see your tickets'),
-      );
-    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
