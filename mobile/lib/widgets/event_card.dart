@@ -10,15 +10,6 @@ class EventCard extends StatelessWidget {
 
   const EventCard({super.key, required this.event, this.onTap});
 
-  // Turns 8000 into "8,000"
-  String _formatPrice(int price) {
-    final text = price.toString();
-    return text.replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+$)'),
-      (match) => '${match[1]},',
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(

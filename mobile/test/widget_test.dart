@@ -8,23 +8,39 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:mobile/features/auth/logic/auth_controller.dart';
 import 'package:mobile/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
+  testWidgets('Main shell updates ticket and profile tabs after auth changes', (
+    WidgetTester tester,
+  ) async {
+    authController.logOut();
     await tester.pumpWidget(const MyApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    final navigationBar = tester.widget<NavigationBar>(
+      find.byType(NavigationBar),
+    );
+    expect(navigationBar.selectedIndex, 0);
+    expect(navigationBar.destinations, hasLength(3));
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    await tester.tap(find.byIcon(Icons.account_balance_wallet_outlined));
     await tester.pump();
+    expect(find.text('Log in to see your tickets'), findsOneWidget);
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    await tester.runAsync(
+      () => authController.logIn('demo@ticketmaster.mw', 'demo1234'),
+    );
+    await tester.pump();
+    expect(find.text('Log in to see your tickets'), findsNothing);
+    expect(find.text('My Tickets'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.person_outline));
+    await tester.pump();
+    expect(find.text('Log in to view profile'), findsNothing);
+
+    authController.logOut();
+    await tester.pump();
+    expect(find.text('Log in to view profile'), findsOneWidget);
   });
 }

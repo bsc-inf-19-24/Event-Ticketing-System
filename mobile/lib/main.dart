@@ -1,9 +1,5 @@
-
-
 import 'package:flutter/material.dart';
-import 'package:mobile/screens/signup_screen.dart';
 import 'package:mobile/screens/main_shell.dart';
-import 'package:mobile/features/profile/ui/profile_screen.dart';
 
 void main() => runApp(const MyApp());
 
@@ -19,7 +15,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
         scaffoldBackgroundColor: Colors.white,
       ),
-      home:  const MainShell(),
+      home: const MainShell(),
     );
   }
 }

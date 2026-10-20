@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/screens/signup_screen.dart';
-import '../theme/app_colors.dart';
+import 'package:mobile/features/auth/logic/auth_controller.dart';
 
-// TODO: replace with the real login state from the auth feature
-bool isLoggedIn = false;
+import '../theme/app_colors.dart';
 
 /// Returns true if the user may continue.
 /// If not logged in, shows the prompt and returns false.
 Future<bool> requireLogin(BuildContext context) async {
-  if (isLoggedIn) return true;
+  if (authController.isLoggedIn) return true;
 
   await showModalBottomSheet(
     context: context,
