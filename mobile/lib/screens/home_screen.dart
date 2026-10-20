@@ -6,6 +6,8 @@ import '../models/event.dart';
 import '../theme/app_colors.dart';
 import '../widgets/event_card.dart';
 
+const double _homeControlsHeaderHeight = 160;
+
 class HomeScreen extends StatefulWidget {
   final String? customerName;
   final int ticketCount;
@@ -38,30 +40,76 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final events = filteredEvents;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 16),
-            const Text(
-              'TICKET MASTER',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 16),
+                  const Text(
+                    'TICKET MASTER',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildWelcome(),
+                  const SizedBox(height: 12),
+                  _buildTicketsBanner(),
+                  const SizedBox(height: 16),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            _buildWelcome(),
-            const SizedBox(height: 12),
-            _buildTicketsBanner(),
-            const SizedBox(height: 16),
-            _buildSearchBar(),
-            const SizedBox(height: 16),
-            _buildCategoryChips(),
-            const SizedBox(height: 16),
-            Expanded(child: _buildEventList()),
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _HomeControlsHeaderDelegate(
+                searchBar: _buildSearchBar(),
+                categoryChips: _buildCategoryChips(),
+              ),
+            ),
+            if (events.isEmpty)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Text(
+                    'No events in this category yet',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    if (index.isOdd) {
+                      return const SizedBox(height: 16);
+                    }
+
+                    final event = events[index ~/ 2];
+                    return EventCard(
+                      event: event,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                EventDetailsScreen(event: event),
+                          ),
+                        );
+                      },
+                    );
+                  }, childCount: events.length * 2 - 1),
+                ),
+              ),
           ],
         ),
       ),
@@ -175,38 +223,45 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+}
 
-  // Builds the list of events
-  Widget _buildEventList() {
-    final events = filteredEvents;
+/// Keeps the search bar and category chips pinned while events scroll.
+class _HomeControlsHeaderDelegate extends SliverPersistentHeaderDelegate {
+  const _HomeControlsHeaderDelegate({
+    required this.searchBar,
+    required this.categoryChips,
+  });
 
-    if (events.isEmpty) {
-      return const Center(
-        child: Text(
-          'No events in this category yet',
-          style: TextStyle(color: Colors.white70),
-        ),
-      );
-    }
+  final Widget searchBar;
+  final Widget categoryChips;
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      itemCount: events.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 16),
-      itemBuilder: (context, index) {
-        final event = events[index];
-        return EventCard(
-          event: event,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => EventDetailsScreen(event: event),
-              ),
-            );
-          },
-        );
-      },
+  @override
+  double get minExtent => _homeControlsHeaderHeight;
+
+  @override
+  double get maxExtent => _homeControlsHeaderHeight;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Container(
+      color: AppColors.background,
+      child: Column(
+        mainAxisSize: MainAxisSize.max,
+        children: [
+          const SizedBox(height: 16),
+          searchBar,
+          const SizedBox(height: 16),
+          categoryChips,
+          const SizedBox(height: 16),
+        ],
+      ),
     );
   }
+
+  @override
+  bool shouldRebuild(covariant _HomeControlsHeaderDelegate oldDelegate) => true;
 }

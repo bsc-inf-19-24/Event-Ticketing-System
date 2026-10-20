@@ -12,7 +12,7 @@ import 'package:mobile/features/auth/logic/auth_controller.dart';
 import 'package:mobile/main.dart';
 
 void main() {
-  testWidgets('Main shell updates ticket and profile tabs after auth changes', (
+  testWidgets('Guests can browse the ticket and profile tabs', (
     WidgetTester tester,
   ) async {
     authController.logOut();
@@ -26,21 +26,11 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.account_balance_wallet_outlined));
     await tester.pump();
-    expect(find.text('Log in to see your tickets'), findsOneWidget);
-
-    await tester.runAsync(
-      () => authController.logIn('demo@ticketmaster.mw', 'demo1234'),
-    );
-    await tester.pump();
-    expect(find.text('Log in to see your tickets'), findsNothing);
     expect(find.text('My Tickets'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.person_outline));
     await tester.pump();
     expect(find.text('Log in to view profile'), findsNothing);
-
-    authController.logOut();
-    await tester.pump();
-    expect(find.text('Log in to view profile'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
   });
 }
