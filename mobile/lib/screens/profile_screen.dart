@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../features/auth/logic/auth_controller.dart';
 import '../theme/app_colors.dart';
 import '../widgets/login_required_view.dart';
-import '../utils/auth_guard.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -10,7 +10,7 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
 
-    if (!isLoggedIn) {
+    if (!authController.isLoggedIn) {
       return const Scaffold(
         backgroundColor: AppColors.background,
         body: LoginRequiredView(message: 'Log in to see your profile'),

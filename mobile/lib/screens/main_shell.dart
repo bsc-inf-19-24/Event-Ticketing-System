@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../features/auth/logic/auth_controller.dart';
 import '../theme/app_colors.dart';
 import 'home_screen.dart';
+
 import 'package:mobile/features/profile/ui/profile_screen.dart';
+
 import 'tickets_screen.dart';
 
 class MainShell extends StatefulWidget {
@@ -17,23 +20,28 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = [
-      HomeScreen(
-        customerName: '', // Replace with the actual customer name
-        ticketCount: 0, // Replace with the actual ticket count
-        onViewTickets: () {
-          setState(() {
-            currentIndex = 1; // switch to the Tickets tab
-          });
-        },
-      ),
-      const TicketsScreen(),
-      const ProfileScreen(),
-    ];
-
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: IndexedStack(index: currentIndex, children: pages),
+      body: ListenableBuilder(
+        listenable: authController,
+        builder: (context, child) {
+          final pages = [
+            HomeScreen(
+              customerName: '', // Replace with the actual customer name
+              ticketCount: 0, // Replace with the actual ticket count
+              onViewTickets: () {
+                setState(() {
+                  currentIndex = 1; // switch to the Tickets tab
+                });
+              },
+            ),
+            TicketsScreen(),
+            ProfileScreen(),
+          ];
+
+          return IndexedStack(index: currentIndex, children: pages);
+        },
+      ),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
