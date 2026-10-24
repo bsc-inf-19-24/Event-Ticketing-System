@@ -59,6 +59,7 @@ class ProfileScreen extends StatelessWidget {
                     // Profile Header Card (Avatar + Name)
                     const ProfileHeaderCard(
                       name: 'James Doet',
+                      phoneNumber: '+265*********',
                     ),
                     const SizedBox(height: 24.0),
 

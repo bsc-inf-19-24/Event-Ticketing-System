@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 class ProfileHeaderCard extends StatelessWidget {
   final String name;
+  final String phoneNumber;
   final VoidCallback? onAvatarTap;
 
   const ProfileHeaderCard({
     super.key,
     required this.name,
+    required this.phoneNumber,
     this.onAvatarTap,
   });
 
@@ -49,6 +51,25 @@ class ProfileHeaderCard extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 10.0), // Spacing
+
+          // Phone Number Pill Badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+            decoration: BoxDecoration(
+              color: const Color(0xFFD9D9D6), // Matches your badge style
+              borderRadius: BorderRadius.circular(20.0),
+            ),
+            child: Text(
+              phoneNumber,
+              style: const TextStyle(
+                fontSize: 14.0,
+                color: Color(0xFF4A4A4A),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+
         ],
       ),
     );
