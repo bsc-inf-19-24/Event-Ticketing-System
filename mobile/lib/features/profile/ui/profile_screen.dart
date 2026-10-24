@@ -27,17 +27,13 @@ class ProfileScreen extends StatelessWidget {
         child: Column(
           children: [
             // Top Navigation Bar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
               child: Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new, size: 20.0, color: Color(0xFF1E293B)),
-                    onPressed: () {
-                      // Handle back navigation (e.g., Navigator.pop(context))
-                    },
-                  ),
-                  const Expanded(
+                  // Left spacer balancing the right spacer for a centered title
+                  SizedBox(width: 40.0),
+                  Expanded(
                     child: Text(
                       'Profile',
                       textAlign: TextAlign.center,
@@ -48,8 +44,8 @@ class ProfileScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // Invisible spacer to balance out the back button for a centered title
-                  const SizedBox(width: 40.0),
+                  // Right spacer balancing the title position
+                  SizedBox(width: 40.0),
                 ],
               ),
             ),
@@ -60,9 +56,9 @@ class ProfileScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
                 child: Column(
                   children: [
-                    // Profile Header Card (Avatar + Email)
+                    // Profile Header Card (Avatar + Name)
                     const ProfileHeaderCard(
-                      email: 'example@gmail.com',
+                      name: 'James Doet',
                     ),
                     const SizedBox(height: 24.0),
 
