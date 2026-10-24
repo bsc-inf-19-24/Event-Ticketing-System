@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 class ProfileHeaderCard extends StatelessWidget {
-  final String email;
+  final String name;
   final VoidCallback? onAvatarTap;
 
   const ProfileHeaderCard({
     super.key,
-    required this.email,
+    required this.name,
     this.onAvatarTap,
   });
 
@@ -33,7 +33,7 @@ class ProfileHeaderCard extends StatelessWidget {
           ),
           const SizedBox(height: 16.0),
 
-          // Email Pill Badge
+          // Name Pill Badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
             decoration: BoxDecoration(
@@ -41,7 +41,7 @@ class ProfileHeaderCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(20.0),
             ),
             child: Text(
-              email,
+              name,
               style: const TextStyle(
                 fontSize: 14.0,
                 color: Color(0xFF4A4A4A),

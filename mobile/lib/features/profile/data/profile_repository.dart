@@ -4,7 +4,7 @@ class ProfileRepository {
     await Future.delayed(const Duration(milliseconds: 500)); // Simulate network lag
     // In a real app, this would be an http or dio call: e.g., await dio.get('/user/profile');
     return {
-      'email': 'example@gmail.com',
+      'name': 'James doet',
       'avatarUrl': '',
     };
   }
