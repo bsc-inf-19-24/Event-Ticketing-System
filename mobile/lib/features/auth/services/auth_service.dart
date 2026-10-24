@@ -1,4 +1,4 @@
-import '../models/app_user.dart';
+import 'package:mobile/features/auth/models/app_user.dart';
 
 /// An authentication operation failed.
 class AuthException implements Exception {
