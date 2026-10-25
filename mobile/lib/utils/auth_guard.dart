@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/screens/signup_screen.dart';
 import 'package:mobile/features/auth/logic/auth_controller.dart';
+import 'package:mobile/screens/login_screen.dart';
+
 
 import '../theme/app_colors.dart';
 
@@ -47,7 +49,10 @@ Future<bool> requireLogin(BuildContext context) async {
                 ),
                 onPressed: () {
                   Navigator.pop(sheetContext);
-                  // TODO: open the login screen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  );
                 },
                 child: const Text('Log in'),
               ),
