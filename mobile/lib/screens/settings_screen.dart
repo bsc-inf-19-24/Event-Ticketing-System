@@ -10,7 +10,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _darkMode = false;
+ // bool _darkMode = false;
   bool _notificationsEnabled = true;
   String _selectedLanguage = 'English';
 
@@ -22,7 +22,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(16.0),
         children: [
           _buildSectionHeader('Preferences'),
-
+           /**
           // Dark Mode Switch
           SwitchListTile(
             title: const Text('Dark Mode'),
@@ -33,10 +33,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               setState(() {
                 _darkMode = value;
               });
+
               // TODO: Connect to your Theme Provider / Controller
             },
           ),
-
+            **/
           // Notifications Switch
           SwitchListTile(
             title: const Text('Push Notifications'),
@@ -70,7 +71,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const Divider(height: 32),
           _buildSectionHeader('Account & Privacy'),
-
+          /**
           // Edit Profile Option
           ListTile(
             leading: const Icon(Icons.person_outline),
@@ -81,7 +82,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // TODO: Navigate to Edit Profile Screen
             },
           ),
-
+            **/
           // Privacy Policy
           ListTile(
             leading: const Icon(Icons.privacy_tip_outlined),
