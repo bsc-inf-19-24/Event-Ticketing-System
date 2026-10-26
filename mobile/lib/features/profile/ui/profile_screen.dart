@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/features/auth/logic/auth_controller.dart';
+import 'package:mobile/screens/login_screen.dart';
+
 import 'widgets/profile_header_card.dart';
 import 'widgets/profile_menu_item.dart';
 
@@ -113,7 +116,11 @@ class ProfileScreen extends StatelessWidget {
                           ),
                         ),
                         onPressed: () {
-                          // TODO: Trigger log out logic
+                          authController.logOut();
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const LoginScreen()),
+                          );
                         },
                         child: const Text(
                           'Log Out',

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+
 import 'privacy_policy_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({Key? key}) : super(key: key);
+  const SettingsScreen({super.key});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -16,10 +17,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Settings'), centerTitle: true),
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
@@ -132,7 +130,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 context: context,
                 applicationName: 'Mobile App',
                 applicationVersion: '1.0.0',
-                applicationLegalese: '© 2026 Mobile App Inc. All rights reserved.',
+                applicationLegalese:
+                    '© 2026 Mobile App Inc. All rights reserved.',
               );
             },
           ),
@@ -145,14 +144,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const Icon(Icons.logout, color: Colors.redAccent),
             title: const Text(
               'Log Out',
-              style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             onTap: () => _showLogoutDialog(context),
           ),
 
           // Delete Account
           ListTile(
-            leading: const Icon(Icons.delete_forever_outlined, color: Colors.red),
+            leading: const Icon(
+              Icons.delete_forever_outlined,
+              color: Colors.red,
+            ),
             title: const Text(
               'Delete Account',
               style: TextStyle(color: Colors.red),
@@ -201,7 +206,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 12),
               ...languages.map(
-                    (lang) => ListTile(
+                (lang) => ListTile(
                   title: Text(lang),
                   trailing: _selectedLanguage == lang
                       ? Icon(Icons.check, color: Theme.of(context).primaryColor)
@@ -231,10 +236,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           content: const SingleChildScrollView(
             child: Text(
               'Welcome to our app! By using our service, you agree to comply with and be bound by the following terms...\n\n'
-                  '1. Usage Rules\n'
-                  '2. User Conduct\n'
-                  '3. Intellectual Property Rights\n'
-                  '4. Limitation of Liability',
+              '1. Usage Rules\n'
+              '2. User Conduct\n'
+              '3. Intellectual Property Rights\n'
+              '4. Limitation of Liability',
             ),
           ),
           actions: [
@@ -255,7 +260,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Log Out'),
-          content: const Text('Are you sure you want to log out of your account?'),
+          content: const Text(
+            'Are you sure you want to log out of your account?',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
