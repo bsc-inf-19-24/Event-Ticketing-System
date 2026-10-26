@@ -49,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
     // pushReplacement so login and sign-up screens don't stack
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const SignUpScreen()),
+      MaterialPageRoute(builder: (_) => const SignupScreen()),
     );
   }
 
