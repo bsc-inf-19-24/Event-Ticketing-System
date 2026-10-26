@@ -5,6 +5,10 @@ import 'package:mobile/screens/login_screen.dart';
 import 'widgets/profile_header_card.dart';
 import 'widgets/profile_menu_item.dart';
 
+import 'package:mobile/screens/settings_screen.dart';
+import 'package:mobile/screens/contact_us.dart';
+import 'package:mobile/screens/privacy_policy_screen.dart';
+
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -60,25 +64,40 @@ class ProfileScreen extends StatelessWidget {
                       title: 'Settings',
                       showChevron: true, // Shows the right arrow icon matching prototype
                       onTap: () {
-                        // TODO: Navigate to Settings screen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SettingsScreen(),
+                          ),
+                        );
                       },
                     ),
                     const SizedBox(height: 12.0),
 
                     ProfileMenuItem(
                       title: 'Contact Support',
-                      showChevron: false,
+                      showChevron: true,
                       onTap: () {
-                        // TODO: Navigate to Support screen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ContactUsScreen(),
+                          ),
+                        );
                       },
                     ),
                     const SizedBox(height: 12.0),
 
                     ProfileMenuItem(
                       title: 'Privacy Policy',
-                      showChevron: false,
+                      showChevron: true,
                       onTap: () {
-                        // TODO: Navigate to Privacy Policy screen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const PrivacyPolicyScreen(),
+                          ),
+                        );
                       },
                     ),
                     const SizedBox(height: 48.0),

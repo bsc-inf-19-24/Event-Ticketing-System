@@ -1,9 +1,11 @@
+import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
 import '../models/ticket.dart';
-import '../data/sample_tickets.dart';
+import '../services/ticket_repository.dart';
 import '../services/ticket_storage.dart';
+import '../theme/app_colors.dart';
 import 'ticket_details_screen.dart';
 
 class TicketsScreen extends StatefulWidget {
@@ -15,25 +17,49 @@ class TicketsScreen extends StatefulWidget {
 
 class _TicketsScreenState extends State<TicketsScreen> {
   final TicketStorage _storage = TicketStorage();
+  final TicketRepository _repository = TicketRepository();
+  final Connectivity _connectivity = Connectivity();
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
-  List<Ticket> _savedTickets = [];
+  TicketListResult? _result;
   bool _loading = true;
   String? _error;
+
+  bool get _isOffline => _result?.isOffline ?? false;
+  Set<String> get _savedIds => _result?.savedIds ?? const <String>{};
 
   @override
   void initState() {
     super.initState();
-    _loadSavedTickets();
+    _load();
+    // Reload (and refresh saved tickets) whenever connectivity changes.
+    _connectivitySub = _connectivity.onConnectivityChanged.listen((_) => _load());
   }
 
-  Future<void> _loadSavedTickets() async {
+  @override
+  void dispose() {
+    _connectivitySub?.cancel();
+    super.dispose();
+  }
+
+  Future<bool> _hasConnection() async {
     try {
-      final tickets = await _storage.getSavedTickets();
+      final results = await _connectivity.checkConnectivity();
+      return !results.contains(ConnectivityResult.none);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _load() async {
+    try {
+      final result =
+          await _repository.load(hasConnection: await _hasConnection());
 
       if (!mounted) return;
 
       setState(() {
-        _savedTickets = tickets;
+        _result = result;
         _loading = false;
         _error = null;
       });
@@ -42,7 +68,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
 
       setState(() {
         _loading = false;
-        _error = 'Could not load saved tickets.';
+        _error = 'Could not load tickets.';
       });
     }
   }
@@ -50,7 +76,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
   Future<bool> _saveTicket(Ticket ticket) async {
     try {
       await _storage.saveTicket(ticket);
-      await _loadSavedTickets();
+      await _load();
 
       if (!mounted) return true;
 
@@ -68,8 +94,40 @@ class _TicketsScreenState extends State<TicketsScreen> {
     }
   }
 
+  Future<bool> _deleteTicket(Ticket ticket) async {
+    try {
+      await _storage.deleteTicket(ticket.id);
+      await _load();
+
+      if (!mounted) return true;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ticket removed from this device.')),
+      );
+      return true;
+    } catch (_) {
+      if (!mounted) return false;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not remove ticket.')),
+      );
+      return false;
+    }
+  }
+
   void _openTicket(Ticket ticket) {
-    final isSaved = _savedTickets.any((saved) => saved.id == ticket.id);
+    final isSaved = _savedIds.contains(ticket.id);
+
+    if (_isOffline && !isSaved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "This ticket isn't downloaded. Connect to the internet to view it.",
+          ),
+        ),
+      );
+      return;
+    }
 
     Navigator.push(
       context,
@@ -77,7 +135,9 @@ class _TicketsScreenState extends State<TicketsScreen> {
         builder: (_) => TicketDetailsScreen(
           ticket: ticket,
           isSaved: isSaved,
+          isOffline: _isOffline,
           onDownload: _saveTicket,
+          onDelete: _deleteTicket,
         ),
       ),
     );
@@ -85,12 +145,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final savedIds = _savedTickets.map((ticket) => ticket.id).toSet();
-    final ticketsById = {for (final ticket in sampleTickets) ticket.id: ticket};
-    for (final ticket in _savedTickets) {
-      ticketsById[ticket.id] = ticket;
-    }
-    final tickets = ticketsById.values.toList();
+    final tickets = _result?.tickets ?? const <Ticket>[];
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -106,54 +161,108 @@ class _TicketsScreenState extends State<TicketsScreen> {
           fontWeight: FontWeight.w600,
         ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-          ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(_error!),
-                  ElevatedButton(
-                    onPressed: _loadSavedTickets,
-                    child: const Text('Retry'),
-                  ),
-                ],
+      body: Column(
+        children: [
+          if (_isOffline) _OfflineBanner(lastSynced: _result?.lastSynced),
+          Expanded(child: _buildBody(tickets)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBody(List<Ticket> tickets) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_error!, style: const TextStyle(color: Colors.white)),
+            const SizedBox(height: 8),
+            ElevatedButton(onPressed: _load, child: const Text('Retry')),
+          ],
+        ),
+      );
+    }
+
+    if (tickets.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.confirmation_number_outlined,
+                color: Colors.white70,
+                size: 48,
               ),
-            )
-          : tickets.isEmpty
-          ? const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.confirmation_number_outlined,
-                    color: Colors.white70,
-                    size: 48,
-                  ),
-                  SizedBox(height: 12),
-                  Text(
-                    'You have no tickets yet',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ],
+              const SizedBox(height: 12),
+              Text(
+                _isOffline
+                    ? 'No tickets downloaded for offline use.\nConnect to the internet to download your tickets.'
+                    : 'You have no tickets yet',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white),
               ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: tickets.length,
-              itemBuilder: (context, index) {
-                final ticket = tickets[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _TicketCard(
-                    ticket: ticket,
-                    isSaved: savedIds.contains(ticket.id),
-                    onTap: () => _openTicket(ticket),
-                  ),
-                );
-              },
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        itemCount: tickets.length,
+        itemBuilder: (context, index) {
+          final ticket = tickets[index];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _TicketCard(
+              ticket: ticket,
+              isSaved: _savedIds.contains(ticket.id),
+              onTap: () => _openTicket(ticket),
             ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _OfflineBanner extends StatelessWidget {
+  final DateTime? lastSynced;
+
+  const _OfflineBanner({this.lastSynced});
+
+  @override
+  Widget build(BuildContext context) {
+    final sync = lastSynced == null
+        ? ''
+        : ' Last updated ${TimeOfDay.fromDateTime(lastSynced!.toLocal()).format(context)}.';
+
+    return Container(
+      width: double.infinity,
+      color: Colors.orange.shade800,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          const Icon(Icons.cloud_off, color: Colors.white, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              "You're offline. Showing downloaded tickets only.$sync",
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -202,7 +311,18 @@ class _TicketCard extends StatelessWidget {
                                 size: 36,
                               ),
                             )
-                          : Image.asset(ticket.imagePath, fit: BoxFit.cover),
+                          : Image.asset(
+                              ticket.imagePath,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const ColoredBox(
+                                color: AppColors.card,
+                                child: Icon(
+                                  Icons.broken_image_outlined,
+                                  color: Colors.white70,
+                                  size: 36,
+                                ),
+                              ),
+                            ),
                     ),
                     Expanded(
                       child: Padding(
@@ -223,39 +343,14 @@ class _TicketCard extends StatelessWidget {
                             _TicketText(ticket.date),
                             _TicketText(ticket.venue),
                             _TicketText('Status: ${ticket.status}'),
-                            if (isSaved)
-                              DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: AppColors.surface,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: const Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.check_circle,
-                                        color: Colors.white,
-                                        size: 14,
-                                      ),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'Saved offline',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                            _StatusChip(
+                              icon: isSaved
+                                  ? Icons.check_circle
+                                  : Icons.cloud_outlined,
+                              label: isSaved
+                                  ? 'Available offline'
+                                  : 'Online only',
+                            ),
                           ],
                         ),
                       ),
@@ -267,6 +362,41 @@ class _TicketCard extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _StatusChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white, size: 14),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white, fontSize: 11),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
