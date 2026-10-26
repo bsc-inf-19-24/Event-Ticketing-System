@@ -39,6 +39,14 @@ dependencies:
   cupertino_icons: ^1.0.8
   fluttertoast: ^10.0.2
 
+  # HTTP networking for calling your backend authentication endpoints
+  http: ^1.2.0
+
+
+  # State management for handling loading, success, and error states (Provider pattern)
+  provider: ^6.1.2
+
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -94,3 +102,5 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+

@@ -65,7 +65,7 @@ Future<bool> requireLogin(BuildContext context) async {
                   Navigator.pop(sheetContext);
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => SignUpScreen()),
+                    MaterialPageRoute(builder: (_) => LoginScreen()),
                   );
                 },
                 child: const Text('Create an account'),
