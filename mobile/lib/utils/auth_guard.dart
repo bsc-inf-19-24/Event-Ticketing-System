@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:mobile/screens/signup_screen.dart';
 import 'package:mobile/features/auth/logic/auth_controller.dart';
 import 'package:mobile/screens/login_screen.dart';
 
@@ -70,7 +69,7 @@ Future<bool> requireLogin(BuildContext context) async {
                   Navigator.pop(sheetContext);
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => SignUpScreen()),
+                    MaterialPageRoute(builder: (_) => LoginScreen()),
                   );
                 },
                 child: const Text('Create an account'),
