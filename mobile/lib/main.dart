@@ -10,7 +10,7 @@ import 'features/auth/data/datasources/mock_auth_remote_datasource.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/domain/usecases/login_usecase.dart';
 import 'features/auth/data/presentation/provider/auth_provider.dart';
-import 'features/auth/data/presentation/views/login_screen.dart';
+import 'package:mobile/screens/login_screen.dart';
 
 void main() {
   // 1. Initialize core services and dependencies using the Mock Data Source
@@ -47,9 +47,9 @@ class MyApp extends StatelessWidget {
           useMaterial3: true,
           scaffoldBackgroundColor: Colors.white,
         ),
-        // 3. Set home to LoginScreen for testing credential verification
+        // 3. Start on the login screen
         home: const MainShell(),
-      ),
+        ),
     );
   }
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:mobile/features/auth/logic/auth_controller.dart';
-import 'package:mobile/features/auth/services/auth_service.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
+import 'auth_common.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -15,8 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _hidePassword = true;
-  bool _loading = false;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -25,56 +24,28 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _onLoginPressed() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _loading = true);
+  void _onLoginPressed() {
+    FocusScope.of(context).unfocus();
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    try {
-      await authController.logIn(
-        _emailController.text,
-        _passwordController.text,
-      );
-      if (!mounted) return;
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    } on AuthException catch (e) {
-      _showMessage(e.message);
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+    // TODO: call your AuthProvider.login(email, password) here.
+    Fluttertoast.showToast(msg: 'Login service is not connected yet.');
   }
 
-  void _onGooglePressed() => _showMessage('Google sign-in coming soon');
+  void _onForgotPassword() {
+    // TODO: navigate to your forgot-password flow.
+    Fluttertoast.showToast(msg: 'Forgot password is not connected yet.');
+  }
 
-  void _onCreateAccountPressed() {
-    // pushReplacement so login and sign-up screens don't stack
-    Navigator.pushReplacement(
-      context,
+  void _onGooglePressed() {
+    Fluttertoast.showToast(msg: 'Google sign-in is not connected yet.');
+  }
+
+  Future<void> _goToSignup() async {
+    final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => const SignupScreen()),
     );
-  }
-
-  void _showMessage(String text) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-  }
-
-  /// One style for both input fields.
-  InputDecoration _fieldStyle(String hint, {Widget? suffix}) {
-    OutlineInputBorder border(Color color) => OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
-      borderSide: BorderSide(color: color),
-    );
-
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: const TextStyle(color: Colors.black38),
-      suffixIcon: suffix,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      enabledBorder: border(const Color(0xFFE0E0E0)),
-      focusedBorder: border(Colors.black),
-      errorBorder: border(Colors.red),
-      focusedErrorBorder: border(Colors.red),
-    );
+    if (ok == true && mounted) Navigator.of(context).pop(true);
   }
 
   @override
@@ -84,209 +55,88 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Form(
                 key: _formKey,
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Logo
-                    const Icon(
-                      Icons.confirmation_number,
-                      size: 80,
-                      color: Colors.black,
+                    const AuthLogo(),
+                    const SizedBox(height: 36),
+                    const AuthHeading(
+                      title: 'Welcome back',
+                      subtitle: 'Log in to your account to continue',
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'TICKET MASTER',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: 'serif',
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 24),
 
-                    // Heading
-                    const Text(
-                      'Welcome Back',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Enter your email and password to log in',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, color: Colors.black87),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Email
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
-                      autofillHints: const [AutofillHints.email],
-                      decoration: _fieldStyle('email@domain.com'),
-                      validator: (value) {
-                        final text = value?.trim() ?? '';
-                        if (text.isEmpty) return 'Enter your email';
-                        if (!text.contains('@')) return 'Enter a valid email';
-                        return null;
-                      },
+                      decoration: authFieldDecoration(
+                        label: 'Email Address',
+                        hint: 'email@domain.com',
+                      ),
+                      validator: validateEmail,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
 
-                    // Password
                     TextFormField(
                       controller: _passwordController,
-                      obscureText: _hidePassword,
+                      obscureText: _obscurePassword,
                       textInputAction: TextInputAction.done,
-                      autofillHints: const [AutofillHints.password],
                       onFieldSubmitted: (_) => _onLoginPressed(),
-                      decoration: _fieldStyle(
-                        'Password',
-                        suffix: IconButton(
+                      decoration: authFieldDecoration(
+                        label: 'Password',
+                        hint: 'Enter your password',
+                        suffixIcon: IconButton(
+                          tooltip: _obscurePassword
+                              ? 'Show password'
+                              : 'Hide password',
                           icon: Icon(
-                            _hidePassword
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: Colors.black54,
                           ),
-                          onPressed: () =>
-                              setState(() => _hidePassword = !_hidePassword),
+                          onPressed: () => setState(
+                                  () => _obscurePassword = !_obscurePassword),
                         ),
                       ),
-                      validator: (value) => (value == null || value.isEmpty)
-                          ? 'Enter your password'
+                      // Existing accounts only need a non-empty password;
+                      // the strength rules apply at sign up.
+                      validator: (v) => (v == null || v.isEmpty)
+                          ? 'Please enter your password'
                           : null,
                     ),
-                    const SizedBox(height: 8),
 
-                    // Links
                     Align(
-                      alignment: Alignment.centerLeft,
+                      alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: () {
-                          // TODO: forgot password flow
-                        },
+                        onPressed: _onForgotPassword,
                         style: TextButton.styleFrom(
-                          foregroundColor: Colors.black54,
+                          foregroundColor: Colors.black87,
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
                         ),
-                        child: const Text('Forgot password'),
+                        child: const Text('Forgot password?',
+                            style: TextStyle(fontSize: 13)),
                       ),
                     ),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton(
-                        onPressed: _onCreateAccountPressed,
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.black54,
-                        ),
-                        child: const Text('Create an account'),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
 
-                    // Log in button
-                    SizedBox(
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: _loading ? null : _onLoginPressed,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: _loading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text(
-                                'Log in',
-                                style: TextStyle(fontWeight: FontWeight.w500),
-                              ),
-                      ),
-                    ),
+                    PrimaryButton(label: 'Log in', onPressed: _onLoginPressed),
                     const SizedBox(height: 20),
-
-                    // Divider with "or"
-                    const Row(
-                      children: [
-                        Expanded(child: Divider(color: Color(0xFFE0E0E0))),
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 12),
-                          child: Text(
-                            'or',
-                            style: TextStyle(
-                              color: Colors.black45,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                        Expanded(child: Divider(color: Color(0xFFE0E0E0))),
-                      ],
-                    ),
+                    const OrDivider(),
                     const SizedBox(height: 20),
+                    GoogleButton(onPressed: _onGooglePressed),
+                    const SizedBox(height: 24),
 
-                    // Google button (same look as the sign-up screen)
-                    SizedBox(
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: _onGooglePressed,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFEEEEEE),
-                          foregroundColor: Colors.black,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            ShaderMask(
-                              shaderCallback: (bounds) => const SweepGradient(
-                                colors: [
-                                  Color(0xFF4285F4),
-                                  Color(0xFF34A853),
-                                  Color(0xFFFBBC05),
-                                  Color(0xFFEA4335),
-                                  Color(0xFF4285F4),
-                                ],
-                              ).createShader(bounds),
-                              child: const Text(
-                                'G',
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            const Text(
-                              'Continue with Google',
-                              style: TextStyle(fontWeight: FontWeight.w500),
-                            ),
-                          ],
-                        ),
-                      ),
+                    SwitchAuthRow(
+                      question: "Don't have an account?",
+                      actionLabel: 'Sign up',
+                      onPressed: _goToSignup,
                     ),
                   ],
                 ),
