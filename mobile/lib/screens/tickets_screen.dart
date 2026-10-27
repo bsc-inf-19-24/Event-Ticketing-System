@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 
@@ -33,7 +34,9 @@ class _TicketsScreenState extends State<TicketsScreen> {
     super.initState();
     _load();
     // Reload (and refresh saved tickets) whenever connectivity changes.
-    _connectivitySub = _connectivity.onConnectivityChanged.listen((_) => _load());
+    _connectivitySub = _connectivity.onConnectivityChanged.listen(
+      (_) => _load(),
+    );
   }
 
   @override
@@ -53,8 +56,9 @@ class _TicketsScreenState extends State<TicketsScreen> {
 
   Future<void> _load() async {
     try {
-      final result =
-          await _repository.load(hasConnection: await _hasConnection());
+      final result = await _repository.load(
+        hasConnection: await _hasConnection(),
+      );
 
       if (!mounted) return;
 
@@ -108,9 +112,9 @@ class _TicketsScreenState extends State<TicketsScreen> {
     } catch (_) {
       if (!mounted) return false;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not remove ticket.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Could not remove ticket.')));
       return false;
     }
   }
@@ -314,7 +318,7 @@ class _TicketCard extends StatelessWidget {
                           : Image.asset(
                               ticket.imagePath,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const ColoredBox(
+                              errorBuilder: (_, _, _) => const ColoredBox(
                                 color: AppColors.card,
                                 child: Icon(
                                   Icons.broken_image_outlined,

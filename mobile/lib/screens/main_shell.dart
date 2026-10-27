@@ -27,8 +27,8 @@ class _MainShellState extends State<MainShell> {
         builder: (context, child) {
           final pages = [
             HomeScreen(
-              customerName: '', // Replace with the actual customer name
-              ticketCount: 0, // Replace with the actual ticket count
+              customerName: null,
+              ticketCount: 0, // TODO: replace with real ticket count (saved tickets / API).
               onViewTickets: () {
                 setState(() {
                   currentIndex = 1; // switch to the Tickets tab

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../features/auth/logic/auth_controller.dart';
 import 'event_details_screen.dart';
 import '../data/sample_events.dart';
 import '../models/event.dart';
@@ -62,8 +63,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
                   _buildWelcome(),
-                  const SizedBox(height: 12),
-                  _buildTicketsBanner(),
+                  if (authController.isLoggedIn) ...[
+                    const SizedBox(height: 12),
+                    _buildTicketsBanner(),
+                  ],
                   const SizedBox(height: 16),
                 ],
               ),
@@ -118,13 +121,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Builds the welcome message
   Widget _buildWelcome() {
-    final name = widget.customerName;
+    final name = authController.user?.name ?? widget.customerName;
+    final hasName =
+        authController.isLoggedIn && name != null && name.isNotEmpty;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Align(
         alignment: Alignment.centerLeft,
         child: Text(
-          (name == null || name.isEmpty) ? 'Welcome!' : 'Welcome back, $name!',
+          hasName ? 'Welcome back, $name!' : 'Welcome!',
           style: const TextStyle(color: Colors.white, fontSize: 18),
         ),
       ),
