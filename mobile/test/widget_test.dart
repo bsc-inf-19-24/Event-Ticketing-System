@@ -8,6 +8,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:mobile/core/storage/secure_storage.dart';
+import 'package:mobile/features/auth/data/datasources/mock_auth_remote_datasource.dart';
+import 'package:mobile/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:mobile/features/auth/domain/usecases/login_usecase.dart';
 import 'package:mobile/features/auth/logic/auth_controller.dart';
 import 'package:mobile/main.dart';
 
@@ -16,7 +20,16 @@ void main() {
     WidgetTester tester,
   ) async {
     authController.logOut();
-    await tester.pumpWidget(const MyApp());
+
+    final secureStorage = SecureStorageService();
+    final mockRemoteDataSource = MockAuthRemoteDataSource();
+    final authRepository = AuthRepositoryImpl(
+      remoteDataSource: mockRemoteDataSource,
+      secureStorage: secureStorage,
+    );
+    final loginUseCase = LoginUseCase(repository: authRepository);
+
+    await tester.pumpWidget(MyApp(loginUseCase: loginUseCase));
 
     final navigationBar = tester.widget<NavigationBar>(
       find.byType(NavigationBar),

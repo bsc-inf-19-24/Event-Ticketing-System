@@ -1,11 +1,12 @@
 //fORM ui , TextFormField, validation
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '/core/utils/validators.dart';
 import '../provider/auth_provider.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -52,10 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Customer Login'),
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('Customer Login'), elevation: 0),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -141,7 +139,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
                         // Submit Button / Loading Indicator
                         ElevatedButton(
-                          onPressed: authProvider.isLoading ? null : _submitForm,
+                          onPressed: authProvider.isLoading
+                              ? null
+                              : _submitForm,
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
@@ -150,17 +150,17 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           child: authProvider.isLoading
                               ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
                               : const Text(
-                            'Login',
-                            style: TextStyle(fontSize: 16),
-                          ),
+                                  'Login',
+                                  style: TextStyle(fontSize: 16),
+                                ),
                         ),
                       ],
                     );

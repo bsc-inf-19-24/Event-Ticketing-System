@@ -5,12 +5,26 @@ import 'auth_service.dart';
 class FakeAuthService implements AuthService {
   /// Creates a service seeded with the demo account.
   FakeAuthService()
-    : _passwords = {'demo@ticketmaster.mw': 'demo1234'},
+    : _passwords = {
+        'demo@ticketmaster.mw': 'demo1234',
+        'test.customer@example.com': 'SecurePassword123!',
+        'admin@example.com': 'password123',
+      },
       _users = {
         'demo@ticketmaster.mw': const AppUser(
           id: 'U-001',
           name: 'Demo User',
           email: 'demo@ticketmaster.mw',
+        ),
+        'test.customer@example.com': const AppUser(
+          id: 'U-002',
+          name: 'Test Customer',
+          email: 'test.customer@example.com',
+        ),
+        'admin@example.com': const AppUser(
+          id: 'U-003',
+          name: 'Admin User',
+          email: 'admin@example.com',
         ),
       };
 
@@ -18,7 +32,7 @@ class FakeAuthService implements AuthService {
 
   final Map<String, String> _passwords;
   final Map<String, AppUser> _users;
-  int _nextUserNumber = 2;
+  int _nextUserNumber = 4;
 
   @override
   Future<AppUser> signUp({

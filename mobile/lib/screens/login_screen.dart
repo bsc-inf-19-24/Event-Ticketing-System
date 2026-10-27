@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:provider/provider.dart';
+import 'package:mobile/features/auth/data/presentation/provider/auth_provider.dart';
 
 import 'auth_common.dart';
 import 'signup_screen.dart';
@@ -24,12 +26,32 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _onLoginPressed() {
+  void _onLoginPressed() async {
     FocusScope.of(context).unfocus();
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    // TODO: call your AuthProvider.login(email, password) here.
-    Fluttertoast.showToast(msg: 'Login service is not connected yet.');
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    final success = await authProvider.login(email, password);
+
+    if (!mounted) return;
+
+    if (success) {
+      Fluttertoast.showToast(
+        msg: 'Login successful! Welcome back.',
+        backgroundColor: Colors.green,
+        textColor: Colors.white,
+      );
+      Navigator.of(context).pop(true);
+    } else {
+      Fluttertoast.showToast(
+        msg: authProvider.errorMessage ?? 'Invalid email or password.',
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+    }
   }
 
   void _onForgotPassword() {
@@ -60,85 +82,114 @@ class _LoginScreenState extends State<LoginScreen> {
               constraints: const BoxConstraints(maxWidth: 420),
               child: Form(
                 key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const AuthLogo(),
-                    const SizedBox(height: 36),
-                    const AuthHeading(
-                      title: 'Welcome back',
-                      subtitle: 'Log in to your account to continue',
-                    ),
-                    const SizedBox(height: 24),
+                child: Consumer<AuthProvider>(
+                  builder: (context, authProvider, child) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const AuthLogo(),
+                        const SizedBox(height: 36),
+                        const AuthHeading(
+                          title: 'Welcome back',
+                          subtitle: 'Log in to your account to continue',
+                        ),
+                        const SizedBox(height: 24),
 
-                    TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      decoration: authFieldDecoration(
-                        label: 'Email Address',
-                        hint: 'email@domain.com',
-                      ),
-                      validator: validateEmail,
-                    ),
-                    const SizedBox(height: 14),
-
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _onLoginPressed(),
-                      decoration: authFieldDecoration(
-                        label: 'Password',
-                        hint: 'Enter your password',
-                        suffixIcon: IconButton(
-                          tooltip: _obscurePassword
-                              ? 'Show password'
-                              : 'Hide password',
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                            color: Colors.black54,
+                        if (authProvider.errorMessage != null) ...[
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              border: Border.all(color: Colors.red.shade200),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              authProvider.errorMessage!,
+                              style: TextStyle(
+                                color: Colors.red.shade800,
+                                fontSize: 13,
+                              ),
+                            ),
                           ),
-                          onPressed: () => setState(
+                          const SizedBox(height: 16),
+                        ],
+
+                        TextFormField(
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          decoration: authFieldDecoration(
+                            label: 'Email Address',
+                            hint: 'email@domain.com',
+                          ),
+                          validator: validateEmail,
+                        ),
+                        const SizedBox(height: 14),
+
+                        TextFormField(
+                          controller: _passwordController,
+                          obscureText: _obscurePassword,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _onLoginPressed(),
+                          decoration: authFieldDecoration(
+                            label: 'Password',
+                            hint: 'Enter your password',
+                            suffixIcon: IconButton(
+                              tooltip: _obscurePassword
+                                  ? 'Show password'
+                                  : 'Hide password',
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                                color: Colors.black54,
+                              ),
+                              onPressed: () => setState(
                                   () => _obscurePassword = !_obscurePassword),
+                            ),
+                          ),
+                          validator: (v) => (v == null || v.isEmpty)
+                              ? 'Please enter your password'
+                              : null,
                         ),
-                      ),
-                      // Existing accounts only need a non-empty password;
-                      // the strength rules apply at sign up.
-                      validator: (v) => (v == null || v.isEmpty)
-                          ? 'Please enter your password'
-                          : null,
-                    ),
 
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: _onForgotPassword,
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.black87,
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: _onForgotPassword,
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.black87,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 4),
+                            ),
+                            child: const Text(
+                              'Forgot password?',
+                              style: TextStyle(fontSize: 13),
+                            ),
+                          ),
                         ),
-                        child: const Text('Forgot password?',
-                            style: TextStyle(fontSize: 13)),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
+                        const SizedBox(height: 4),
 
-                    PrimaryButton(label: 'Log in', onPressed: _onLoginPressed),
-                    const SizedBox(height: 20),
-                    const OrDivider(),
-                    const SizedBox(height: 20),
-                    GoogleButton(onPressed: _onGooglePressed),
-                    const SizedBox(height: 24),
+                        authProvider.isLoading
+                            ? const Center(child: CircularProgressIndicator())
+                            : PrimaryButton(
+                                label: 'Log in',
+                                onPressed: _onLoginPressed,
+                              ),
+                        const SizedBox(height: 20),
+                        const OrDivider(),
+                        const SizedBox(height: 20),
+                        GoogleButton(onPressed: _onGooglePressed),
+                        const SizedBox(height: 24),
 
-                    SwitchAuthRow(
-                      question: "Don't have an account?",
-                      actionLabel: 'Sign up',
-                      onPressed: _goToSignup,
-                    ),
-                  ],
+                        SwitchAuthRow(
+                          question: "Don't have an account?",
+                          actionLabel: 'Sign up',
+                          onPressed: _goToSignup,
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),

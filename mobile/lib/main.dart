@@ -10,12 +10,14 @@ import 'features/auth/data/datasources/mock_auth_remote_datasource.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/domain/usecases/login_usecase.dart';
 import 'features/auth/data/presentation/provider/auth_provider.dart';
-import 'package:mobile/screens/login_screen.dart';
+import 'features/auth/logic/auth_controller.dart';
 
 void main() {
   // 1. Initialize core services and dependencies using the Mock Data Source
   final secureStorage = SecureStorageService();
-  final mockRemoteDataSource = MockAuthRemoteDataSource();
+  final mockRemoteDataSource = MockAuthRemoteDataSource(
+    authService: fakeAuthService,
+  );
 
   final authRepository = AuthRepositoryImpl(
     remoteDataSource: mockRemoteDataSource,
@@ -49,7 +51,7 @@ class MyApp extends StatelessWidget {
         ),
         // 3. Start on the login screen
         home: const MainShell(),
-        ),
+      ),
     );
   }
 }
