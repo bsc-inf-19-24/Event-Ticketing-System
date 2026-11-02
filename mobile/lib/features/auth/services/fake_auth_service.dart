@@ -1,4 +1,5 @@
 import 'package:mobile/features/auth/models/app_user.dart';
+
 import 'auth_service.dart';
 
 /// An in-memory authentication service for demo use.

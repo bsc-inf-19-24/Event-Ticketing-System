@@ -1,8 +1,14 @@
 import 'package:flutter/foundation.dart';
 
 import '../models/app_user.dart';
+import '../services/api_auth_service.dart';
 import '../services/auth_service.dart';
 import '../services/fake_auth_service.dart';
+
+const useFakeAuth = bool.fromEnvironment(
+  'USE_FAKE_AUTH',
+  defaultValue: true,
+);
 
 /// Coordinates authentication state for the application.
 class AuthController extends ChangeNotifier {
@@ -61,6 +67,7 @@ class AuthController extends ChangeNotifier {
   }
 }
 
-// Share the demo accounts between the app login flow and auth state.
 final fakeAuthService = FakeAuthService();
-final authController = AuthController(fakeAuthService);
+final authController = AuthController(
+  useFakeAuth ? fakeAuthService : ApiAuthService(),
+);

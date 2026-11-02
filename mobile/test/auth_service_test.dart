@@ -3,6 +3,7 @@ import 'package:mobile/features/auth/logic/auth_controller.dart';
 import 'package:mobile/features/auth/models/app_user.dart';
 import 'package:mobile/features/auth/services/auth_service.dart';
 import 'package:mobile/features/auth/services/fake_auth_service.dart';
+import 'package:mobile/features/auth/data/presentation/provider/auth_provider.dart';
 import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/features/auth/data/datasources/mock_auth_remote_datasource.dart';
 
@@ -198,6 +199,21 @@ void main() {
       controller.logOut();
 
       expect(notifications, greaterThanOrEqualTo(4));
+      controller.dispose();
+    });
+  });
+
+  group('AuthProvider', () {
+    test('logs in through its configured auth controller', () async {
+      final controller = AuthController(service);
+      final provider = AuthProvider(controller: controller);
+
+      expect(await provider.login('demo@ticketmaster.mw', 'demo1234'), isTrue);
+      expect(provider.isLoggedIn, isTrue);
+      expect(provider.isSuccess, isTrue);
+      expect(provider.isLoading, isFalse);
+
+      provider.dispose();
       controller.dispose();
     });
   });
