@@ -1,7 +1,8 @@
-//manages loading state and error
+// manages loading state and error
 import 'package:flutter/foundation.dart';
 import 'package:mobile/features/auth/domain/usecases/login_usecase.dart';
 import 'package:mobile/features/auth/logic/auth_controller.dart';
+import 'package:mobile/features/auth/models/app_user.dart';
 
 class AuthProvider extends ChangeNotifier {
   final LoginUseCase loginUseCase;
@@ -26,9 +27,15 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final trimmedEmail = email.trim();
-      await loginUseCase.execute(trimmedEmail, password);
-      await authController.logIn(trimmedEmail, password);
+      final user = await loginUseCase.execute(email, password);
+      authController.setAuthenticatedUser(
+        AppUser(
+          id: user.id,
+          name: user.name.isEmpty ? user.email : user.name,
+          email: user.email,
+        ),
+      );
+
       _isLoading = false;
       _isSuccess = true;
       notifyListeners();

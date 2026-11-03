@@ -158,9 +158,9 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
                             borderRadius: BorderRadius.circular(24),
                           ),
                           padding: const EdgeInsets.all(16),
-                          // Drawn locally from stored qrData, no network needed.
+                          // Encodes the full ticket payload for organizer scanning.
                           child: QrImageView(
-                            data: widget.ticket.qrData,
+                            data: widget.ticket.qrPayload,
                             version: QrVersions.auto,
                             size: qrSize,
                             backgroundColor: Colors.white,
@@ -197,6 +197,14 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
                             value: widget.ticket.orderId,
                           ),
                         _TicketDetailRow(
+                          label: 'User ID',
+                          value: widget.ticket.userId,
+                        ),
+                        _TicketDetailRow(
+                          label: 'Payment ID',
+                          value: widget.ticket.paymentId,
+                        ),
+                        _TicketDetailRow(
                           label: 'Price',
                           value: 'MWK ${formatPrice(widget.ticket.price)}',
                         ),
@@ -213,6 +221,10 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
                               ? 'Status (last known)'
                               : 'Status',
                           value: widget.ticket.status,
+                        ),
+                        _TicketDetailRow(
+                          label: 'Entry',
+                          value: widget.ticket.used ? 'Used' : 'Not used',
                         ),
                         const SizedBox(height: 16),
                         const Text(
