@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../features/auth/logic/auth_controller.dart';
 import '../features/tickets/logic/tickets_controller.dart';
 import '../models/ticket.dart';
 import '../theme/app_colors.dart';
+import '../widgets/login_required_view.dart';
 import 'main_shell.dart';
 import 'ticket_details_screen.dart';
 
@@ -63,6 +65,43 @@ class _TicketsScreenState extends State<TicketsScreen> {
   }
 
   @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: authController,
+      builder: (context, _) {
+        final tickets = _result?.tickets ?? const <Ticket>[];
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            title: const Text('My Tickets'),
+            centerTitle: true,
+            automaticallyImplyLeading: false,
+            backgroundColor: AppColors.background,
+            foregroundColor: Colors.white,
+            titleTextStyle: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          body: authController.isLoggedIn
+              ? Column(
+                  children: [
+                    if (_isOffline)
+                      _OfflineBanner(lastSynced: _result?.lastSynced),
+                    Expanded(child: _buildBody(tickets)),
+                  ],
+                )
+              : const LoginRequiredView(
+                  title: 'Log in to view your tickets',
+                  message:
+                      'You need an account to buy and keep your tickets.',
+                ),
+        );
+      },
+    );
+  }
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: AppColors.background,
     appBar: AppBar(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/features/auth/logic/auth_controller.dart';
-import 'package:mobile/screens/login_screen.dart';
+import 'package:mobile/theme/app_colors.dart';
+import 'package:mobile/widgets/login_required_view.dart';
 
 import 'widgets/profile_header_card.dart';
 import 'widgets/profile_menu_item.dart';
@@ -14,6 +15,37 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: authController,
+      builder: (context, _) {
+        if (!authController.isLoggedIn) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(
+              title: const Text('Profile'),
+              centerTitle: true,
+              automaticallyImplyLeading: false,
+              backgroundColor: AppColors.background,
+              foregroundColor: Colors.white,
+              titleTextStyle: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            body: const LoginRequiredView(
+              title: 'Log in to view your profile',
+              message: 'You need an account to manage your profile.',
+            ),
+          );
+        }
+
+        return _buildLoggedInProfile(context);
+      },
+    );
+  }
+
+  Widget _buildLoggedInProfile(BuildContext context) {
     // Soft blue background color extracted from your prototype mockup
     const backgroundColor = Color(0xFFB5D1E4);
 
@@ -117,10 +149,6 @@ class ProfileScreen extends StatelessWidget {
                         ),
                         onPressed: () {
                           authController.logOut();
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const LoginScreen()),
-                          );
                         },
                         child: const Text(
                           'Log Out',

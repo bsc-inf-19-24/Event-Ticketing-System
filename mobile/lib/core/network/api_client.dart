@@ -42,7 +42,10 @@ class ApiClient {
         throw ApiException(errorMessage, response.statusCode);
       }
     } on SocketException {
-      throw ApiException('No internet connection. Please check your network settings.');
+      throw ApiException(
+        'Could not reach the server at $baseUrl. Check the server address, port, '
+        'network, and firewall.',
+      );
     } on FormatException {
       throw ApiException('Received invalid response format from the server.');
     } catch (e) {
