@@ -2,8 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:mobile/features/auth/logic/auth_controller.dart';
 import 'package:mobile/screens/login_screen.dart';
 import 'package:mobile/screens/signup_screen.dart';
+//manages loading state and error
+import 'package:flutter/foundation.dart';
+import 'package:mobile/features/auth/domain/usecases/login_usecase.dart';
 
-import '../theme/app_colors.dart';
+class AuthProvider extends ChangeNotifier {
+  final LoginUseCase loginUseCase;
+
+  AuthProvider({required this.loginUseCase});
 
 /// Returns true if the user may continue.
 /// If not logged in, shows the prompt and returns false.
@@ -111,5 +117,40 @@ class AuthPromptButtons extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
+
+  String? _errorMessage;
+  String? get errorMessage => _errorMessage;
+
+  bool _isSuccess = false;
+  bool get isSuccess => _isSuccess;
+
+  Future<bool> login(String email, String password) async {
+    _isLoading = true;
+    _errorMessage = null;
+    _isSuccess = false;
+    notifyListeners();
+
+    try {
+      await loginUseCase.execute(email, password);
+      _isLoading = false;
+      _isSuccess = true;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      // Extracts clean error message from ApiExceptions or general exceptions
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  void clearError() {
+    _errorMessage = null;
+    notifyListeners();
   }
 }

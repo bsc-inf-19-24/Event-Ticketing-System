@@ -80,6 +80,20 @@ class Ticket {
       userId: (json['userId'] as String?) ?? '',
       paymentId: (json['paymentId'] as String?) ?? '',
       used: json['used'] as bool? ?? false,
+      id: _stringValue(json['id']),
+      eventName: _stringValue(json['eventName'], fallback: 'Event'),
+      date: _stringValue(json['date']),
+      venue: _stringValue(json['venue']),
+      status: _stringValue(json['status'], fallback: 'Confirmed'),
+      qrData: _stringValue(json['qrData']),
+      ticketType: _stringValue(json['ticketType'], fallback: 'Standard'),
+      price: json['price'] is num ? (json['price'] as num).toInt() : 0,
+      purchasedOn: _stringValue(json['purchasedOn']),
+      imagePath: _stringValue(json['imagePath']),
+      userId: _stringValue(json['userId']),
     );
   }
 }
+
+String _stringValue(dynamic value, {String fallback = ''}) =>
+    value is String ? value : fallback;
