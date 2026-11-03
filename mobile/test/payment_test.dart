@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/features/auth/logic/auth_controller.dart';
 import 'package:mobile/features/auth/services/fake_auth_service.dart';
 import 'package:mobile/features/orders/models/order.dart';
+import 'package:mobile/features/orders/order_rules.dart';
 import 'package:mobile/features/orders/services/order_repository.dart';
 import 'package:mobile/features/payment/logic/payment_controller.dart';
 import 'package:mobile/features/payment/logic/payment_verifier.dart';
@@ -152,27 +153,37 @@ void main() {
           order: order,
           event: _event(),
           ticketsController: tickets,
+          buyerName: 'Demo User',
+          buyerEmail: 'demo@ticketmaster.mw',
         ),
         repository.completePaidOrder(
           order: order,
           event: _event(),
           ticketsController: tickets,
+          buyerName: 'Demo User',
+          buyerEmail: 'demo@ticketmaster.mw',
         ),
       ]);
       final created = duplicateAttempts.expand((attempt) => attempt).toList();
-      expect(created, hasLength(2));
+      expect(created, hasLength(1));
       expect(
         duplicateAttempts.where((attempt) => attempt.isEmpty),
         hasLength(1),
       );
-      expect(created.map((ticket) => ticket.id).toSet(), hasLength(2));
-      expect(created.map((ticket) => ticket.qrData).toSet(), hasLength(2));
+      expect(created.map((ticket) => ticket.id).toSet(), hasLength(1));
+      expect(created.map((ticket) => ticket.qrData).toSet(), hasLength(1));
       expect(created.every((ticket) => ticket.userId == 'U-001'), isTrue);
+      expect(created.single.paymentId, order.txRef);
+      expect(created.single.orderId, order.id);
+      expect(created.single.buyerName, 'Demo User');
+      expect(created.single.buyerEmail, 'demo@ticketmaster.mw');
       expect(
         await repository.completePaidOrder(
           order: order,
           event: _event(),
           ticketsController: tickets,
+          buyerName: 'Demo User',
+          buyerEmail: 'demo@ticketmaster.mw',
         ),
         isEmpty,
       );
@@ -214,6 +225,126 @@ void main() {
       auth.dispose();
     },
   );
+
+  test('PaymentController rejects multiple tickets or ticket types', () async {
+    final auth = AuthController(FakeAuthService());
+    await auth.logIn('demo@ticketmaster.mw', 'demo1234');
+    final controller = PaymentController(
+      paymentService: FakePaymentService(random: Random(10)),
+      orderRepository: OrderRepository(random: Random(11)),
+      ticketsController: TicketsController(
+        storage: _MemoryTicketStorage(),
+        auth: auth,
+      ),
+      auth: auth,
+      random: Random(12),
+    );
+
+    await expectLater(
+      controller.begin(
+        event: _event(),
+        items: const [
+          OrderItem(ticketTypeName: 'Standard', unitPrice: 50, quantity: 2),
+        ],
+        total: 100,
+        method: PaymentMethod.card,
+        phone: '',
+      ),
+      throwsA(isA<PaymentException>()),
+    );
+    await expectLater(
+      controller.begin(
+        event: _event(),
+        items: const [
+          OrderItem(ticketTypeName: 'Standard', unitPrice: 50, quantity: 1),
+          OrderItem(ticketTypeName: 'VIP', unitPrice: 100, quantity: 1),
+        ],
+        total: 150,
+        method: PaymentMethod.card,
+        phone: '',
+      ),
+      throwsA(isA<PaymentException>()),
+    );
+    expect(controller.order, isNull);
+    controller.dispose();
+    auth.dispose();
+  });
+
+  test(
+    'a successful payment creates one ticket with buyer and payment details',
+    () async {
+      final auth = AuthController(FakeAuthService());
+      await auth.logIn('demo@ticketmaster.mw', 'demo1234');
+      final ticketStorage = _MemoryTicketStorage();
+      final tickets = TicketsController(storage: ticketStorage, auth: auth);
+      await tickets.load();
+      final controller = PaymentController(
+        paymentService: FakePaymentService(random: Random(13)),
+        orderRepository: OrderRepository(random: Random(14)),
+        ticketsController: tickets,
+        auth: auth,
+        random: Random(15),
+      );
+      await controller.begin(
+        event: _event(),
+        items: const [
+          OrderItem(
+            ticketTypeName: 'Standard',
+            unitPrice: 50,
+            quantity: maxTicketsPerOrder,
+          ),
+        ],
+        total: 50,
+        method: PaymentMethod.card,
+        phone: '',
+      );
+
+      expect(await controller.finish(_event(), PaymentOutcome.success), isTrue);
+      expect(controller.purchasedTickets, hasLength(1));
+      final ticket = controller.purchasedTickets.single;
+      expect(ticket.paymentId, controller.order!.txRef);
+      expect(ticket.orderId, controller.order!.id);
+      expect(ticket.buyerName, 'Demo User');
+      expect(ticket.buyerEmail, 'demo@ticketmaster.mw');
+
+      controller.dispose();
+      tickets.dispose();
+      auth.dispose();
+    },
+  );
+
+  test('Ticket JSON supports old data and round-trips the receipt fields', () {
+    final oldTicket = Ticket.fromJson({
+      'id': 'TM-000001',
+      'eventName': 'Event',
+      'date': '10 Nov 2026',
+      'venue': 'Lilongwe',
+      'status': 'Confirmed',
+      'qrData': 'TM|ticket',
+    });
+    expect(oldTicket.paymentId, isEmpty);
+    expect(oldTicket.orderId, isEmpty);
+    expect(oldTicket.buyerName, isEmpty);
+    expect(oldTicket.buyerEmail, isEmpty);
+
+    final ticket = Ticket(
+      id: 'TM-000002',
+      eventName: 'Event',
+      date: '10 Nov 2026',
+      venue: 'Lilongwe',
+      status: 'Confirmed',
+      qrData: 'TM|receipt',
+      paymentId: 'TM-payment',
+      orderId: 'ORD-payment',
+      buyerName: 'Demo User',
+      buyerEmail: 'demo@ticketmaster.mw',
+    );
+    final restored = Ticket.fromJson(ticket.toJson());
+    expect(restored.paymentId, ticket.paymentId);
+    expect(restored.orderId, ticket.orderId);
+    expect(restored.buyerName, ticket.buyerName);
+    expect(restored.buyerEmail, ticket.buyerEmail);
+  });
 
   test(
     'TicketsController clears on logout and filters tickets by user',
@@ -273,9 +404,13 @@ Order _order({String id = 'ORD-test', String txRef = 'TM-test'}) => Order(
   eventVenue: 'Lilongwe',
   eventDate: '10 Nov 2026',
   items: const [
-    OrderItem(ticketTypeName: 'Standard', unitPrice: 50, quantity: 2),
+    OrderItem(
+      ticketTypeName: 'Standard',
+      unitPrice: 50,
+      quantity: maxTicketsPerOrder,
+    ),
   ],
-  total: 100,
+  total: 50,
   status: 'pending',
   txRef: txRef,
   paymentMethod: 'card',

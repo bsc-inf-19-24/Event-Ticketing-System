@@ -9,6 +9,7 @@ import '../../../models/event.dart';
 import '../../../models/ticket.dart';
 import '../../../services/ticket_storage.dart';
 import '../models/order.dart';
+import '../order_rules.dart';
 
 /// Stores orders separately from ticket records in the existing preferences store.
 class OrderRepository {
@@ -71,6 +72,8 @@ class OrderRepository {
     required Order order,
     required Event event,
     required TicketsController ticketsController,
+    required String buyerName,
+    required String buyerEmail,
   }) {
     final previous = _orderLocks[order.id] ?? Future<void>.value();
     final completion = Completer<void>();
@@ -81,6 +84,8 @@ class OrderRepository {
       order: order,
       event: event,
       ticketsController: ticketsController,
+      buyerName: buyerName,
+      buyerEmail: buyerEmail,
     );
   }
 
@@ -90,6 +95,8 @@ class OrderRepository {
     required Order order,
     required Event event,
     required TicketsController ticketsController,
+    required String buyerName,
+    required String buyerEmail,
   }) async {
     await previous;
     try {
@@ -97,6 +104,8 @@ class OrderRepository {
         order: order,
         event: event,
         ticketsController: ticketsController,
+        buyerName: buyerName,
+        buyerEmail: buyerEmail,
       );
     } finally {
       completion.complete();
@@ -110,7 +119,14 @@ class OrderRepository {
     required Order order,
     required Event event,
     required TicketsController ticketsController,
+    required String buyerName,
+    required String buyerEmail,
   }) async {
+    if (!hasValidTicketSelection(order.items)) {
+      throw StateError(
+        'Order must contain exactly one ticket type and ticket.',
+      );
+    }
     final orders = await _readOrders();
     final index = orders.indexWhere((saved) => saved.id == order.id);
     if (index < 0) throw StateError('Order could not be found.');
@@ -139,6 +155,10 @@ class OrderRepository {
             purchasedOn: _formatPurchaseDate(DateTime.now()),
             imagePath: event.imagePath,
             userId: order.userId,
+            paymentId: order.txRef,
+            orderId: order.id,
+            buyerName: buyerName,
+            buyerEmail: buyerEmail,
           ),
         );
       }

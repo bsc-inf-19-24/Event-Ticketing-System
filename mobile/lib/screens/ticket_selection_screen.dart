@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../features/orders/order_rules.dart';
 import '../features/orders/models/order.dart';
 import '../models/event.dart';
 import '../theme/app_colors.dart';
 import '../utils/format.dart';
 import 'checkout_screen.dart';
 
-/// Lets a customer select up to ten tickets for one event.
+/// Lets a customer select one ticket type for an event.
 class TicketSelectionScreen extends StatefulWidget {
   const TicketSelectionScreen({super.key, required this.event});
 
@@ -18,7 +19,7 @@ class TicketSelectionScreen extends StatefulWidget {
 
 class _TicketSelectionScreenState extends State<TicketSelectionScreen> {
   late final List<TicketType> _types;
-  late final List<int> _quantities;
+  int? _selectedIndex;
 
   @override
   void initState() {
@@ -26,14 +27,10 @@ class _TicketSelectionScreenState extends State<TicketSelectionScreen> {
     _types = widget.event.ticketTypes.isEmpty
         ? [TicketType(name: 'Standard', price: widget.event.price)]
         : widget.event.ticketTypes;
-    _quantities = List.filled(_types.length, 0);
+    if (_types.length == 1) _selectedIndex = 0;
   }
 
-  int get _quantity => _quantities.fold(0, (sum, quantity) => sum + quantity);
-  int get _total => List.generate(
-    _types.length,
-    (index) => _types[index].price * _quantities[index],
-  ).fold(0, (sum, price) => sum + price);
+  int get _total => _selectedIndex == null ? 0 : _types[_selectedIndex!].price;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -60,12 +57,15 @@ class _TicketSelectionScreenState extends State<TicketSelectionScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                for (var index = 0; index < _types.length; index++)
-                  _ticketTypeCard(index),
-                const SizedBox(height: 8),
-                const Text(
-                  'Maximum 10 tickets per order',
-                  style: TextStyle(color: Colors.white70),
+                RadioGroup<int>(
+                  groupValue: _selectedIndex,
+                  onChanged: (value) => setState(() => _selectedIndex = value),
+                  child: Column(
+                    children: [
+                      for (var index = 0; index < _types.length; index++)
+                        _ticketTypeCard(index),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -97,7 +97,7 @@ class _TicketSelectionScreenState extends State<TicketSelectionScreen> {
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: _quantity == 0 ? null : _continue,
+                    onPressed: _selectedIndex == null ? null : _continue,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.button,
                       foregroundColor: Colors.white,
@@ -118,58 +118,33 @@ class _TicketSelectionScreenState extends State<TicketSelectionScreen> {
     final type = _types[index];
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(type.name, style: const TextStyle(color: Colors.white)),
-                const SizedBox(height: 6),
-                Text(
-                  'MWK ${formatPrice(type.price)}',
-                  style: const TextStyle(color: Colors.white70),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            onPressed: _quantities[index] == 0
-                ? null
-                : () => setState(() => _quantities[index]--),
-            icon: const Icon(Icons.remove_circle_outline),
-            color: AppColors.accent,
-          ),
-          Text(
-            '${_quantities[index]}',
-            style: const TextStyle(color: Colors.white, fontSize: 16),
-          ),
-          IconButton(
-            onPressed: _quantity >= 10
-                ? null
-                : () => setState(() => _quantities[index]++),
-            icon: const Icon(Icons.add_circle_outline),
-            color: AppColors.accent,
-          ),
-        ],
+      child: RadioListTile<int>(
+        value: index,
+        activeColor: AppColors.accent,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        title: Text(type.name, style: const TextStyle(color: Colors.white)),
+        subtitle: Text(
+          'MWK ${formatPrice(type.price)}',
+          style: const TextStyle(color: Colors.white70),
+        ),
       ),
     );
   }
 
   void _continue() {
-    final items = <OrderItem>[
-      for (var index = 0; index < _types.length; index++)
-        if (_quantities[index] > 0)
-          OrderItem(
-            ticketTypeName: _types[index].name,
-            unitPrice: _types[index].price,
-            quantity: _quantities[index],
-          ),
+    final selectedIndex = _selectedIndex;
+    if (selectedIndex == null) return;
+    final selectedType = _types[selectedIndex];
+    final items = [
+      OrderItem(
+        ticketTypeName: selectedType.name,
+        unitPrice: selectedType.price,
+        quantity: maxTicketsPerOrder,
+      ),
     ];
     Navigator.push(
       context,

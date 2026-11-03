@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../features/orders/models/order.dart';
 import '../features/payment/logic/payment_controller.dart';
 import '../features/payment/models/payment_models.dart';
 import '../features/tickets/logic/tickets_controller.dart';
@@ -390,15 +391,15 @@ class PaymentResultScreen extends StatelessWidget {
     );
   }
 
-  Widget _receipt(dynamic order) => _infoCard(
+  Widget _receipt(Order order) => _infoCard(
     children: [
       _receiptRow('Order ID', order.id),
       _receiptRow('Transaction', order.txRef),
       _receiptRow('Event', order.eventTitle),
-      for (final item in order.items)
+      if (order.items.isNotEmpty)
         _receiptRow(
-          '${item.ticketTypeName} x ${item.quantity}',
-          'MWK ${formatPrice(item.unitPrice * item.quantity)}',
+          order.items.first.ticketTypeName,
+          'MWK ${formatPrice(order.items.first.unitPrice)}',
         ),
       _receiptRow('Total', 'MWK ${formatPrice(order.total)}'),
       _receiptRow('Payment method', order.paymentMethod),
