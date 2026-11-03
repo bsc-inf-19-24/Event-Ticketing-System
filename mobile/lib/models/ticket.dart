@@ -1,3 +1,4 @@
+import 'dart:convert';
 
 class Ticket {
   final String id;
@@ -10,6 +11,9 @@ class Ticket {
   final int price;
   final String purchasedOn;
   final String imagePath;
+  final String userId;
+  final String paymentId;
+  final bool used;
 
   const Ticket({
     required this.id,
@@ -22,7 +26,28 @@ class Ticket {
     this.price = 0,
     this.purchasedOn = '',
     this.imagePath = '',
+    this.userId = '',
+    this.paymentId = '',
+    this.used = false,
   });
+
+  /// Full ticket payload encoded in the QR code for gate scanning.
+  /// Later the organizer app will POST this to the backend to mark the ticket used.
+  Map<String, dynamic> toScanPayload() => {
+    'ticketId': id,
+    'userId': userId,
+    'paymentId': paymentId,
+    'eventName': eventName,
+    'ticketType': ticketType,
+    'price': price,
+    'date': date,
+    'venue': venue,
+    'status': status,
+    'purchasedOn': purchasedOn,
+    'used': used,
+  };
+
+  String get qrPayload => jsonEncode(toScanPayload());
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -35,6 +60,9 @@ class Ticket {
     'price': price,
     'purchasedOn': purchasedOn,
     'imagePath': imagePath,
+    'userId': userId,
+    'paymentId': paymentId,
+    'used': used,
   };
 
   factory Ticket.fromJson(Map<String, dynamic> json) {
@@ -49,6 +77,9 @@ class Ticket {
       price: (json['price'] as num?)?.toInt() ?? 0,
       purchasedOn: (json['purchasedOn'] as String?) ?? '',
       imagePath: (json['imagePath'] as String?) ?? '',
+      userId: (json['userId'] as String?) ?? '',
+      paymentId: (json['paymentId'] as String?) ?? '',
+      used: json['used'] as bool? ?? false,
     );
   }
 }
