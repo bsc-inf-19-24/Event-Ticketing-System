@@ -125,7 +125,7 @@ class EventDetailsScreen extends StatelessWidget {
         children: [
           for (final ticket in event.ticketTypes) ...[
             Text(ticket.name, style: _bodyStyle),
-            Text('MWK ${formatPrice(ticket.price)}', style: _bodyStyle),
+            Text('Price: MWK ${formatPrice(ticket.price)}', style: _bodyStyle),
             const SizedBox(height: 8),
           ],
           const SizedBox(height: 8),
