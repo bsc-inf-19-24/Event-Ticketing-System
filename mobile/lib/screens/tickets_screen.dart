@@ -69,8 +69,6 @@ class _TicketsScreenState extends State<TicketsScreen> {
     return ListenableBuilder(
       listenable: authController,
       builder: (context, _) {
-        final tickets = _result?.tickets ?? const <Ticket>[];
-
         return Scaffold(
           backgroundColor: AppColors.background,
           appBar: AppBar(
@@ -86,41 +84,19 @@ class _TicketsScreenState extends State<TicketsScreen> {
             ),
           ),
           body: authController.isLoggedIn
-              ? Column(
-                  children: [
-                    if (_isOffline)
-                      _OfflineBanner(lastSynced: _result?.lastSynced),
-                    Expanded(child: _buildBody(tickets)),
-                  ],
+              ? ListenableBuilder(
+                  listenable: ticketsController,
+                  builder: (context, _) =>
+                      _buildBody(ticketsController.tickets),
                 )
               : const LoginRequiredView(
                   title: 'Log in to view your tickets',
-                  message:
-                      'You need an account to buy and keep your tickets.',
+                  message: 'You need an account to buy and keep your tickets.',
                 ),
         );
       },
     );
   }
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.background,
-    appBar: AppBar(
-      title: const Text('My Tickets'),
-      centerTitle: true,
-      automaticallyImplyLeading: false,
-      backgroundColor: AppColors.background,
-      foregroundColor: Colors.white,
-      titleTextStyle: const TextStyle(
-        color: Colors.white,
-        fontSize: 20,
-        fontWeight: FontWeight.w600,
-      ),
-    ),
-    body: ListenableBuilder(
-      listenable: ticketsController,
-      builder: (context, _) => _buildBody(ticketsController.tickets),
-    ),
-  );
 
   Widget _buildBody(List<Ticket> tickets) {
     if (_loading || ticketsController.isLoading) {

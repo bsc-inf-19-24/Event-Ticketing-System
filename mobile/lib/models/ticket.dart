@@ -14,6 +14,9 @@ class Ticket {
   final String userId;
   final String paymentId;
   final bool used;
+  final String orderId;
+  final String buyerName;
+  final String buyerEmail;
 
   const Ticket({
     required this.id,
@@ -29,6 +32,9 @@ class Ticket {
     this.userId = '',
     this.paymentId = '',
     this.used = false,
+    this.orderId = '',
+    this.buyerName = '',
+    this.buyerEmail = '',
   });
 
   /// Full ticket payload encoded in the QR code for gate scanning.
@@ -63,23 +69,13 @@ class Ticket {
     'userId': userId,
     'paymentId': paymentId,
     'used': used,
+    'orderId': orderId,
+    'buyerName': buyerName,
+    'buyerEmail': buyerEmail,
   };
 
   factory Ticket.fromJson(Map<String, dynamic> json) {
     return Ticket(
-      id: json['id'] as String,
-      eventName: json['eventName'] as String,
-      date: json['date'] as String,
-      venue: json['venue'] as String,
-      status: json['status'] as String,
-      qrData: json['qrData'] as String,
-      ticketType: (json['ticketType'] as String?) ?? 'Standard',
-      price: (json['price'] as num?)?.toInt() ?? 0,
-      purchasedOn: (json['purchasedOn'] as String?) ?? '',
-      imagePath: (json['imagePath'] as String?) ?? '',
-      userId: (json['userId'] as String?) ?? '',
-      paymentId: (json['paymentId'] as String?) ?? '',
-      used: json['used'] as bool? ?? false,
       id: _stringValue(json['id']),
       eventName: _stringValue(json['eventName'], fallback: 'Event'),
       date: _stringValue(json['date']),
@@ -91,6 +87,11 @@ class Ticket {
       purchasedOn: _stringValue(json['purchasedOn']),
       imagePath: _stringValue(json['imagePath']),
       userId: _stringValue(json['userId']),
+      paymentId: _stringValue(json['paymentId']),
+      used: json['used'] as bool? ?? false,
+      orderId: _stringValue(json['orderId']),
+      buyerName: _stringValue(json['buyerName']),
+      buyerEmail: _stringValue(json['buyerEmail']),
     );
   }
 }

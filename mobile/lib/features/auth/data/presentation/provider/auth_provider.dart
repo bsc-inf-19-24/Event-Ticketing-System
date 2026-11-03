@@ -1,8 +1,8 @@
 // manages loading state and error
 import 'package:flutter/foundation.dart';
 import 'package:mobile/features/auth/domain/usecases/login_usecase.dart';
-import 'package:mobile/features/auth/logic/auth_controller.dart'; // Import global authController
 import 'package:mobile/features/auth/logic/auth_controller.dart';
+import 'package:mobile/features/auth/models/app_user.dart';
 
 class AuthProvider extends ChangeNotifier {
   final LoginUseCase loginUseCase;
@@ -28,10 +28,13 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final user = await loginUseCase.execute(email, password);
-
-      // KEY LOGIC FIX: Update global authController state so auth_guard knows user is logged in
-      authController.isLoggedIn = true;
-      authController.currentUser = user;
+      authController.setAuthenticatedUser(
+        AppUser(
+          id: user.id,
+          name: user.name.isEmpty ? user.email : user.name,
+          email: user.email,
+        ),
+      );
 
       _isLoading = false;
       _isSuccess = true;

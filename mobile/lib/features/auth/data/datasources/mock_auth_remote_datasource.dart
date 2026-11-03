@@ -19,6 +19,7 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
       return UserModel(
         id: user.id,
         email: user.email,
+        name: user.name,
         token: 'mock_jwt_secure_token_${DateTime.now().millisecondsSinceEpoch}',
       );
     } on AuthException {
