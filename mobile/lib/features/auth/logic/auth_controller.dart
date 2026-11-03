@@ -61,5 +61,6 @@ class AuthController extends ChangeNotifier {
   }
 }
 
-// Swap FakeAuthService for the real service here later.
-final authController = AuthController(FakeAuthService());
+// Share the demo accounts between the app login flow and auth state.
+final fakeAuthService = FakeAuthService();
+final authController = AuthController(fakeAuthService);

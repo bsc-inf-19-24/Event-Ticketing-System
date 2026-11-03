@@ -2,6 +2,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:mobile/features/auth/domain/usecases/login_usecase.dart';
 import 'package:mobile/features/auth/logic/auth_controller.dart'; // Import global authController
+import 'package:mobile/features/auth/logic/auth_controller.dart';
 
 class AuthProvider extends ChangeNotifier {
   final LoginUseCase loginUseCase;
@@ -16,6 +17,8 @@ class AuthProvider extends ChangeNotifier {
 
   bool _isSuccess = false;
   bool get isSuccess => _isSuccess;
+
+  bool get isLoggedIn => authController.isLoggedIn;
 
   Future<bool> login(String email, String password) async {
     _isLoading = true;

@@ -3,6 +3,8 @@ import 'package:mobile/features/auth/logic/auth_controller.dart';
 import 'package:mobile/features/auth/models/app_user.dart';
 import 'package:mobile/features/auth/services/auth_service.dart';
 import 'package:mobile/features/auth/services/fake_auth_service.dart';
+import 'package:mobile/core/network/api_client.dart';
+import 'package:mobile/features/auth/data/datasources/mock_auth_remote_datasource.dart';
 
 void main() {
   late FakeAuthService service;
@@ -12,6 +14,36 @@ void main() {
   });
 
   group('FakeAuthService', () {
+    test(
+      'accepts each documented demo account through the app data source',
+      () async {
+        final dataSource = MockAuthRemoteDataSource(authService: service);
+        final credentials = {
+          'demo@ticketmaster.mw': 'demo1234',
+          'test.customer@example.com': 'SecurePassword123!',
+          'admin@example.com': 'password123',
+        };
+
+        for (final entry in credentials.entries) {
+          final user = await dataSource.login(entry.key, entry.value);
+          expect(user.email, entry.key);
+        }
+      },
+    );
+
+    test('rejects unknown accounts and incorrect passwords through the app data source', () async {
+      final dataSource = MockAuthRemoteDataSource(authService: service);
+
+      await expectLater(
+        dataSource.login('unknown@example.com', 'anything123'),
+        throwsA(isA<ApiException>()),
+      );
+      await expectLater(
+        dataSource.login('demo@ticketmaster.mw', 'wrongpass'),
+        throwsA(isA<ApiException>()),
+      );
+    });
+
     test('logs in with the seeded demo account', () async {
       final user = await service.logIn(
         email: 'demo@ticketmaster.mw',
@@ -81,7 +113,7 @@ void main() {
         password: 'newpass123',
       );
 
-      expect(createdUser.id, 'U-002');
+      expect(createdUser.id, 'U-004');
       expect(createdUser.email, 'new@ticketmaster.mw');
       expect(loggedInUser, createdUser);
     });

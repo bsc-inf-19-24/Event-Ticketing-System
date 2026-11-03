@@ -1,26 +1,27 @@
 import '../../../../core/network/api_client.dart';
+
 import 'package:mobile/features/auth/data/model/user_model.dart';
+import 'package:mobile/features/auth/services/fake_auth_service.dart';
+import 'package:mobile/features/auth/services/auth_service.dart';
+
 import 'auth_remote_datasource.dart';
 
 class MockAuthRemoteDataSource implements AuthRemoteDataSource {
+  MockAuthRemoteDataSource({FakeAuthService? authService})
+    : _authService = authService ?? FakeAuthService();
+
+  final FakeAuthService _authService;
+
   @override
   Future<UserModel> login(String email, String password) async {
-    // Simulate network delay (e.g., 1 second server response time)
-    await Future.delayed(const Duration(seconds: 1));
-
-    // Define our dummy test account
-    const dummyEmail = 'test.customer@example.com';
-    const dummyPassword = 'SecurePassword123!';
-
-    // Verify credentials
-    if (email.trim().toLowerCase() == dummyEmail && password == dummyPassword) {
+    try {
+      final user = await _authService.logIn(email: email, password: password);
       return UserModel(
-        id: 'user_mock_001',
-        email: dummyEmail,
-        token: 'mock_jwt_secure_token_xyz789',
+        id: user.id,
+        email: user.email,
+        token: 'mock_jwt_secure_token_${DateTime.now().millisecondsSinceEpoch}',
       );
-    } else {
-      // Simulate backend throwing a 401 Unauthorized for incorrect credentials or unregistered accounts
+    } on AuthException {
       throw ApiException('Invalid email or password. Please try again.', 401);
     }
   }
