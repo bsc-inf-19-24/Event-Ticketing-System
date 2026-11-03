@@ -179,6 +179,23 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
                           label: 'Ticket ID',
                           value: widget.ticket.id,
                         ),
+                        if (widget.ticket.buyerName.isNotEmpty ||
+                            widget.ticket.buyerEmail.isNotEmpty)
+                          _TicketHolderRow(
+                            name: widget.ticket.buyerName,
+                            email: widget.ticket.buyerEmail,
+                          ),
+                        if (widget.ticket.paymentId.isNotEmpty)
+                          _TicketDetailRow(
+                            label: 'Payment ID',
+                            value: widget.ticket.paymentId,
+                            selectable: true,
+                          ),
+                        if (widget.ticket.orderId.isNotEmpty)
+                          _TicketDetailRow(
+                            label: 'Order ID',
+                            value: widget.ticket.orderId,
+                          ),
                         _TicketDetailRow(
                           label: 'Price',
                           value: 'MWK ${formatPrice(widget.ticket.price)}',
@@ -346,8 +363,13 @@ class _InfoBanner extends StatelessWidget {
 class _TicketDetailRow extends StatelessWidget {
   final String label;
   final String value;
+  final bool selectable;
 
-  const _TicketDetailRow({required this.label, required this.value});
+  const _TicketDetailRow({
+    required this.label,
+    required this.value,
+    this.selectable = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -362,17 +384,73 @@ class _TicketDetailRow extends StatelessWidget {
           ),
           Expanded(
             flex: 3,
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            child: selectable
+                ? SelectableText(
+                    value,
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  )
+                : Text(
+                    value,
+                    textAlign: TextAlign.end,
+                    softWrap: true,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
           ),
         ],
       ),
     );
   }
+}
+
+class _TicketHolderRow extends StatelessWidget {
+  const _TicketHolderRow({required this.name, required this.email});
+
+  final String name;
+  final String email;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Expanded(
+          flex: 2,
+          child: Text('Ticket holder', style: TextStyle(color: Colors.white70)),
+        ),
+        Expanded(
+          flex: 3,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (name.isNotEmpty)
+                Text(
+                  name,
+                  textAlign: TextAlign.end,
+                  softWrap: true,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              if (email.isNotEmpty)
+                Text(
+                  email,
+                  textAlign: TextAlign.end,
+                  softWrap: true,
+                  style: const TextStyle(color: Colors.white60, fontSize: 12),
+                ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }

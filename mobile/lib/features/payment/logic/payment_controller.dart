@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../features/auth/logic/auth_controller.dart';
 import '../../../features/orders/models/order.dart';
+import '../../../features/orders/order_rules.dart';
 import '../../../features/orders/services/order_repository.dart';
 import '../../../features/tickets/logic/tickets_controller.dart';
 import '../../../models/event.dart';
@@ -36,6 +37,8 @@ class PaymentController extends ChangeNotifier {
   bool isProcessing = false;
   String? failureReason;
   List<Ticket> purchasedTickets = const [];
+  String _buyerName = '';
+  String _buyerEmail = '';
 
   /// Persists an order and starts the chosen local payment simulation.
   Future<void> begin({
@@ -45,12 +48,19 @@ class PaymentController extends ChangeNotifier {
     required PaymentMethod method,
     required String phone,
   }) async {
+    if (!hasValidTicketSelection(items)) {
+      throw const PaymentException(
+        'Choose exactly one ticket type and one ticket to continue.',
+      );
+    }
     final user = _auth.user;
     if (user == null) {
       throw const PaymentException('Please log in to continue.');
     }
     isProcessing = true;
     failureReason = null;
+    _buyerName = user.name;
+    _buyerEmail = user.email;
     notifyListeners();
     final now = DateTime.now();
     final randomDigits = _random.nextInt(10000).toString().padLeft(4, '0');
@@ -153,6 +163,8 @@ class PaymentController extends ChangeNotifier {
         order: currentOrder,
         event: event,
         ticketsController: _ticketsController,
+        buyerName: _buyerName,
+        buyerEmail: _buyerEmail,
       );
       return true;
     } catch (_) {

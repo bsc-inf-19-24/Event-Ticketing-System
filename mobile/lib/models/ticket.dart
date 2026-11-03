@@ -10,6 +10,10 @@ class Ticket {
   final String purchasedOn;
   final String imagePath;
   final String userId;
+  final String paymentId;
+  final String orderId;
+  final String buyerName;
+  final String buyerEmail;
 
   const Ticket({
     required this.id,
@@ -23,6 +27,10 @@ class Ticket {
     this.purchasedOn = '',
     this.imagePath = '',
     this.userId = '',
+    this.paymentId = '',
+    this.orderId = '',
+    this.buyerName = '',
+    this.buyerEmail = '',
   });
 
   Map<String, dynamic> toJson() => {
@@ -37,6 +45,10 @@ class Ticket {
     'purchasedOn': purchasedOn,
     'imagePath': imagePath,
     'userId': userId,
+    'paymentId': paymentId,
+    'orderId': orderId,
+    'buyerName': buyerName,
+    'buyerEmail': buyerEmail,
   };
 
   factory Ticket.fromJson(Map<String, dynamic> json) {
@@ -52,6 +64,10 @@ class Ticket {
       purchasedOn: _stringValue(json['purchasedOn']),
       imagePath: _stringValue(json['imagePath']),
       userId: _stringValue(json['userId']),
+      paymentId: (json['paymentId'] as String?) ?? '',
+      orderId: (json['orderId'] as String?) ?? '',
+      buyerName: (json['buyerName'] as String?) ?? '',
+      buyerEmail: (json['buyerEmail'] as String?) ?? '',
     );
   }
 }

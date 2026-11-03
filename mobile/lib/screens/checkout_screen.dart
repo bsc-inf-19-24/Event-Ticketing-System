@@ -79,19 +79,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           Text(widget.event.date, style: _muted),
                           Text(widget.event.venue, style: _muted),
                           const Divider(color: Colors.white24, height: 24),
-                          for (final item in widget.items)
+                          if (widget.items.isNotEmpty)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 8),
                               child: Row(
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      '${item.ticketTypeName} x ${item.quantity}',
+                                      widget.items.first.ticketTypeName,
                                       style: _muted,
                                     ),
                                   ),
                                   Text(
-                                    'MWK ${formatPrice(item.unitPrice * item.quantity)}',
+                                    'MWK ${formatPrice(widget.items.first.unitPrice)}',
                                     style: _muted,
                                   ),
                                 ],
