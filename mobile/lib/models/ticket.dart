@@ -1,4 +1,3 @@
-
 class Ticket {
   final String id;
   final String eventName;
@@ -10,6 +9,7 @@ class Ticket {
   final int price;
   final String purchasedOn;
   final String imagePath;
+  final String userId;
 
   const Ticket({
     required this.id,
@@ -22,6 +22,7 @@ class Ticket {
     this.price = 0,
     this.purchasedOn = '',
     this.imagePath = '',
+    this.userId = '',
   });
 
   Map<String, dynamic> toJson() => {
@@ -35,20 +36,25 @@ class Ticket {
     'price': price,
     'purchasedOn': purchasedOn,
     'imagePath': imagePath,
+    'userId': userId,
   };
 
   factory Ticket.fromJson(Map<String, dynamic> json) {
     return Ticket(
-      id: json['id'] as String,
-      eventName: json['eventName'] as String,
-      date: json['date'] as String,
-      venue: json['venue'] as String,
-      status: json['status'] as String,
-      qrData: json['qrData'] as String,
-      ticketType: (json['ticketType'] as String?) ?? 'Standard',
-      price: (json['price'] as num?)?.toInt() ?? 0,
-      purchasedOn: (json['purchasedOn'] as String?) ?? '',
-      imagePath: (json['imagePath'] as String?) ?? '',
+      id: _stringValue(json['id']),
+      eventName: _stringValue(json['eventName'], fallback: 'Event'),
+      date: _stringValue(json['date']),
+      venue: _stringValue(json['venue']),
+      status: _stringValue(json['status'], fallback: 'Confirmed'),
+      qrData: _stringValue(json['qrData']),
+      ticketType: _stringValue(json['ticketType'], fallback: 'Standard'),
+      price: json['price'] is num ? (json['price'] as num).toInt() : 0,
+      purchasedOn: _stringValue(json['purchasedOn']),
+      imagePath: _stringValue(json['imagePath']),
+      userId: _stringValue(json['userId']),
     );
   }
 }
+
+String _stringValue(dynamic value, {String fallback = ''}) =>
+    value is String ? value : fallback;
