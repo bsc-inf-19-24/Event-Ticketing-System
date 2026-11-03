@@ -41,11 +41,12 @@ dependencies:
   fluttertoast: ^10.0.2
 
   # HTTP networking for calling your backend authentication endpoints
-  http: ^1.2.0
+  http: ^1.6.0
 
 
   # State management for handling loading, success, and error states (Provider pattern)
   provider: ^6.1.2
+  flutter_secure_storage: ^11.2.0
 
 
 dev_dependencies:
