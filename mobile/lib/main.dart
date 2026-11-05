@@ -3,24 +3,29 @@ import 'package:provider/provider.dart';
 import 'package:mobile/screens/main_shell.dart';
 
 // Core imports
+import 'core/network/api_client.dart';
 import 'core/storage/secure_storage.dart';
 
-// Authentication feature imports (Corrected paths & using Mock Data Source)
+// Authentication feature imports
+import 'features/auth/data/datasources/auth_remote_datasource.dart';
 import 'features/auth/data/datasources/mock_auth_remote_datasource.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/domain/usecases/login_usecase.dart';
 import 'features/auth/data/presentation/provider/auth_provider.dart';
 import 'features/auth/logic/auth_controller.dart';
 
+const apiBaseUrl = String.fromEnvironment('API_BASE_URL');
+
 void main() {
-  // 1. Initialize core services and dependencies using the Mock Data Source
   final secureStorage = SecureStorageService();
-  final mockRemoteDataSource = MockAuthRemoteDataSource(
-    authService: fakeAuthService,
-  );
+  final remoteDataSource = apiBaseUrl.isEmpty
+      ? MockAuthRemoteDataSource(authService: fakeAuthService)
+      : AuthRemoteDataSourceImpl(
+          apiClient: ApiClient(baseUrl: apiBaseUrl.replaceFirst(RegExp(r'/+$'), '')),
+        );
 
   final authRepository = AuthRepositoryImpl(
-    remoteDataSource: mockRemoteDataSource,
+    remoteDataSource: remoteDataSource,
     secureStorage: secureStorage,
   );
   final loginUseCase = LoginUseCase(repository: authRepository);

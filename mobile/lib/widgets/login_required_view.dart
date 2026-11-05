@@ -2,38 +2,49 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../screens/require_login.dart';
+import '../utils/auth_guard.dart';
 
 class LoginRequiredView extends StatelessWidget {
+  final String title;
   final String message;
 
-  const LoginRequiredView({super.key, required this.message});
+  const LoginRequiredView({
+    super.key,
+    required this.title,
+    required this.message,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.lock_outline, size: 48, color: Colors.white70),
-            const SizedBox(height: 16),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white, fontSize: 16),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.button,
-                foregroundColor: Colors.white,
-                shape: const StadiumBorder(),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.lock_outline, size: 48, color: Colors.white70),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-              onPressed: () => requireLogin(context),
-              child: const Text('Log in or sign up'),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70, fontSize: 16),
+              ),
+              const SizedBox(height: 24),
+              const AuthPromptButtons(),
+            ],
+          ),
         ),
       ),
     );

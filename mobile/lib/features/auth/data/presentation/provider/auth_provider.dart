@@ -33,6 +33,10 @@ class AuthProvider extends ChangeNotifier {
         AppUser(
           id: user.id,
           name: user.name ?? user.email.split('@').first,
+      authController.setAuthenticatedUser(
+        AppUser(
+          id: user.id,
+          name: user.name.isEmpty ? user.email : user.name,
           email: user.email,
         ),
       );
