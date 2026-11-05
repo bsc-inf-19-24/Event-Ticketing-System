@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../models/event.dart';
 import '../theme/app_colors.dart';
 import '../utils/format.dart';
-import 'require_login.dart';
 import '../utils/auth_guard.dart';
 import 'ticket_selection_screen.dart';
 

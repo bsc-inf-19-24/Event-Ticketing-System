@@ -46,11 +46,8 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildLoggedInProfile(BuildContext context) {
-    // Soft blue background color extracted from your prototype mockup
-    const backgroundColor = Color(0xFFB5D1E4);
-
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
