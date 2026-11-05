@@ -28,6 +28,12 @@ class AuthController extends ChangeNotifier {
   /// Whether an authentication operation is in progress.
   bool get isBusy => _isBusy;
 
+  /// Stores a user authenticated by another application layer.
+  void setAuthenticatedUser(AppUser user) {
+    _user = user;
+    notifyListeners();
+  }
+
   /// Creates an account and signs the new user in.
   Future<void> signUp(String name, String email, String password) async {
     _isBusy = true;

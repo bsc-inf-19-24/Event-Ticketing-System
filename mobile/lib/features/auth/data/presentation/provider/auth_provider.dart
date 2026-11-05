@@ -28,6 +28,11 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final user = await loginUseCase.execute(email, password);
+
+      authController.setAuthenticatedUser(
+        AppUser(
+          id: user.id,
+          name: user.name ?? user.email.split('@').first,
       authController.setAuthenticatedUser(
         AppUser(
           id: user.id,
