@@ -84,10 +84,12 @@ class ProfileScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
                 child: Column(
                   children: [
-                    // Profile Header Card (Avatar + Name)
-                    const ProfileHeaderCard(
-                      name: 'James Doet',
-                      phoneNumber: '+265*********',
+                    // Profile Header Card (Avatar + Email)
+                    ListenableBuilder(
+                      listenable: authController,
+                      builder: (context, child) => ProfileHeaderCard(
+                        email: authController.user?.email ?? 'Not signed in',
+                      ),
                     ),
                     const SizedBox(height: 24.0),
 
