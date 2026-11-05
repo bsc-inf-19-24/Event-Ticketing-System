@@ -7,6 +7,7 @@ class UserModel extends User {
   const UserModel({
     required super.id,
     required super.email,
+    super.name,
     required this.token,
   });
 
@@ -14,12 +15,13 @@ class UserModel extends User {
     return UserModel(
       id: json['id']?.toString() ?? json['userId']?.toString() ?? '',
       email: json['email'] ?? '',
+      name: json['name'] as String?,
       token: json['token'] ?? json['accessToken'] ?? '',
     );
   }
 
   // Maps the data-layer model into the pure domain entity
   User toDomain() {
-    return User(id: id, email: email);
+    return User(id: id, email: email, name: name);
   }
 }

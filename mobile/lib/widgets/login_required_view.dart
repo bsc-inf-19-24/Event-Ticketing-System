@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../theme/app_colors.dart';
-import '../utils/auth_guard.dart';
+import '../screens/require_login.dart';
 
 class LoginRequiredView extends StatelessWidget {
   final String message;

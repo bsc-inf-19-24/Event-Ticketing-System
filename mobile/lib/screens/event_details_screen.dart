@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/event.dart';
 import '../theme/app_colors.dart';
 import '../utils/format.dart';
-import '../utils/auth_guard.dart';
+import 'require_login.dart';
 
 class EventDetailsScreen extends StatelessWidget {
   final Event event;
