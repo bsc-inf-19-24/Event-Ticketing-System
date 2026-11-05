@@ -5,6 +5,7 @@ import 'package:mobile/features/auth/services/fake_auth_service.dart';
 import 'package:mobile/features/auth/services/auth_service.dart';
 
 import 'auth_remote_datasource.dart';
+import '../../domain/entities/password_reset_request.dart';
 
 class MockAuthRemoteDataSource implements AuthRemoteDataSource {
   MockAuthRemoteDataSource({FakeAuthService? authService})
@@ -24,6 +25,38 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
       );
     } on AuthException {
       throw ApiException('Invalid email or password. Please try again.', 401);
+    }
+  }
+
+  @override
+  Future<PasswordResetRequest> requestPasswordReset(String email) async {
+    try {
+      final code = await _authService.requestPasswordReset(email: email);
+      return PasswordResetRequest(
+        message:
+            'A reset code was created for your account. Demo mode does not '
+            'send email; use the code shown below.',
+        demoVerificationCode: code,
+      );
+    } on AuthException catch (exception) {
+      throw ApiException(exception.message, 404);
+    }
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    try {
+      await _authService.resetPassword(
+        email: email,
+        code: code,
+        newPassword: newPassword,
+      );
+    } on AuthException catch (exception) {
+      throw ApiException(exception.message, 400);
     }
   }
 }
