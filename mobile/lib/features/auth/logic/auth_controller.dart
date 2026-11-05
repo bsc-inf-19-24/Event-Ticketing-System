@@ -19,12 +19,6 @@ class AuthController extends ChangeNotifier {
   /// Whether a user is currently authenticated.
   bool get isLoggedIn => _user != null;
 
-  /// Publishes an authenticated user returned by the repository login flow.
-  void setAuthenticatedUser(AppUser user) {
-    _user = user;
-    notifyListeners();
-  }
-
   /// Whether an authentication operation is in progress.
   bool get isBusy => _isBusy;
 
