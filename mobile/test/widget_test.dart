@@ -7,11 +7,20 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:mobile/features/auth/logic/auth_controller.dart';
 import 'package:mobile/main.dart';
 
 void main() {
+  setUpAll(() {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets('Guests can browse the ticket and profile tabs', (
     WidgetTester tester,
   ) async {
