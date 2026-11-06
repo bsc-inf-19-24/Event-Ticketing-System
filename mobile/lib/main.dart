@@ -11,6 +11,7 @@ import 'features/auth/data/datasources/auth_remote_datasource.dart';
 import 'features/auth/data/datasources/mock_auth_remote_datasource.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/domain/usecases/login_usecase.dart';
+import 'features/auth/domain/usecases/password_reset_usecase.dart';
 import 'features/auth/data/presentation/provider/auth_provider.dart';
 import 'features/auth/logic/auth_controller.dart';
 
@@ -21,7 +22,9 @@ void main() {
   final remoteDataSource = apiBaseUrl.isEmpty
       ? MockAuthRemoteDataSource(authService: fakeAuthService)
       : AuthRemoteDataSourceImpl(
-          apiClient: ApiClient(baseUrl: apiBaseUrl.replaceFirst(RegExp(r'/+$'), '')),
+          apiClient: ApiClient(
+            baseUrl: apiBaseUrl.replaceFirst(RegExp(r'/+$'), ''),
+          ),
         );
 
   final authRepository = AuthRepositoryImpl(
@@ -29,14 +32,25 @@ void main() {
     secureStorage: secureStorage,
   );
   final loginUseCase = LoginUseCase(repository: authRepository);
+  final passwordResetUseCase = PasswordResetUseCase(repository: authRepository);
 
-  runApp(MyApp(loginUseCase: loginUseCase));
+  runApp(
+    MyApp(
+      loginUseCase: loginUseCase,
+      passwordResetUseCase: passwordResetUseCase,
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
   final LoginUseCase loginUseCase;
+  final PasswordResetUseCase passwordResetUseCase;
 
-  const MyApp({super.key, required this.loginUseCase});
+  const MyApp({
+    super.key,
+    required this.loginUseCase,
+    required this.passwordResetUseCase,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +58,10 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (_) => AuthProvider(loginUseCase: loginUseCase),
+          create: (_) => AuthProvider(
+            loginUseCase: loginUseCase,
+            passwordResetUseCase: passwordResetUseCase,
+          ),
         ),
       ],
       child: MaterialApp(

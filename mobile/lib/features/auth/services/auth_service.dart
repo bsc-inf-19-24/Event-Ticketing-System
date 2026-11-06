@@ -23,4 +23,14 @@ abstract class AuthService {
 
   /// Authenticates an account and returns its user.
   Future<AppUser> logIn({required String email, required String password});
+
+  /// Creates a short-lived reset code for a registered account.
+  Future<String> requestPasswordReset({required String email});
+
+  /// Validates a reset code and replaces the account password.
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  });
 }

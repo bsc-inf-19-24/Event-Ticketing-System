@@ -23,15 +23,25 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final List<String> categories = ['For you', 'Sports', 'Concerts', 'Workshop'];
   String selectedCategory = 'For you';
+  String searchQuery = '';
 
   // Events to show, based on the selected chip
   List<Event> get filteredEvents {
-    if (selectedCategory == 'For you') {
-      return sampleEvents;
-    }
-    return sampleEvents
-        .where((event) => event.category == selectedCategory)
-        .toList();
+    final query = searchQuery.trim().toLowerCase();
+    return sampleEvents.where((event) {
+      final matchesCategory =
+          selectedCategory == 'For you' || event.category == selectedCategory;
+      final matchesQuery =
+          query.isEmpty ||
+          [
+            event.title,
+            event.category,
+            event.genre,
+            event.venue,
+            event.date,
+          ].any((value) => value.toLowerCase().contains(query));
+      return matchesCategory && matchesQuery;
+    }).toList();
   }
 
   @override
@@ -74,12 +84,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             if (events.isEmpty)
-              const SliverFillRemaining(
+              SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(
                   child: Text(
-                    'No events in this category yet',
-                    style: TextStyle(color: Colors.white70),
+                    searchQuery.trim().isNotEmpty
+                        ? 'No events found'
+                        : 'No events in this category yet',
+                    style: const TextStyle(color: Colors.white70),
                   ),
                 ),
               )
@@ -183,6 +195,11 @@ class _HomeScreenState extends State<HomeScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: TextField(
+        onChanged: (value) {
+          setState(() {
+            searchQuery = value;
+          });
+        },
         decoration: InputDecoration(
           hintText: 'Search',
           prefixIcon: const Icon(Icons.search),

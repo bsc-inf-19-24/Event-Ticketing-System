@@ -46,11 +46,8 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildLoggedInProfile(BuildContext context) {
-    // Soft blue background color extracted from your prototype mockup
-    const backgroundColor = Color(0xFFB5D1E4);
-
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -84,10 +81,12 @@ class ProfileScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
                 child: Column(
                   children: [
-                    // Profile Header Card (Avatar + Name)
-                    const ProfileHeaderCard(
-                      name: 'James Doet',
-                      phoneNumber: '+265*********',
+                    // Profile Header Card (Avatar + Email)
+                    ListenableBuilder(
+                      listenable: authController,
+                      builder: (context, child) => ProfileHeaderCard(
+                        email: authController.user?.email ?? 'Not signed in',
+                      ),
                     ),
                     const SizedBox(height: 24.0),
 

@@ -1,13 +1,19 @@
 // manages loading state and error
 import 'package:flutter/foundation.dart';
 import 'package:mobile/features/auth/domain/usecases/login_usecase.dart';
+import 'package:mobile/features/auth/domain/usecases/password_reset_usecase.dart';
+import 'package:mobile/features/auth/domain/entities/password_reset_request.dart';
 import 'package:mobile/features/auth/logic/auth_controller.dart';
 import 'package:mobile/features/auth/models/app_user.dart';
 
 class AuthProvider extends ChangeNotifier {
   final LoginUseCase loginUseCase;
+  final PasswordResetUseCase passwordResetUseCase;
 
-  AuthProvider({required this.loginUseCase});
+  AuthProvider({
+    required this.loginUseCase,
+    required this.passwordResetUseCase,
+  });
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -28,10 +34,11 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final user = await loginUseCase.execute(email, password);
+
       authController.setAuthenticatedUser(
         AppUser(
           id: user.id,
-          name: user.name.isEmpty ? user.email : user.name,
+          name: user.name ?? user.email.split('@').first,
           email: user.email,
         ),
       );
@@ -46,6 +53,40 @@ class AuthProvider extends ChangeNotifier {
       _errorMessage = e.toString().replaceFirst('Exception: ', '');
       notifyListeners();
       return false;
+    }
+  }
+
+  Future<PasswordResetRequest> requestPasswordReset(String email) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      return await passwordResetUseCase.requestReset(email);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await passwordResetUseCase.resetPassword(
+        email: email,
+        code: code,
+        newPassword: newPassword,
+      );
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 

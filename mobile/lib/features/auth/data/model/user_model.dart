@@ -3,6 +3,7 @@ import '/features/auth/domain/entities/user.dart';
 
 class UserModel extends User {
   final String token;
+  @override
   final String name;
 
   const UserModel({
@@ -23,6 +24,6 @@ class UserModel extends User {
 
   // Maps the data-layer model into the pure domain entity
   User toDomain() {
-    return User(id: id, email: email);
+    return User(id: id, email: email, name: name);
   }
 }

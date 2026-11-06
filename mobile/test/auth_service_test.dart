@@ -73,6 +73,93 @@ void main() {
       );
     });
 
+    test('resets a password with a valid one-time verification code', () async {
+      final service = FakeAuthService(resetCodeGenerator: () => '123456');
+      final code = await service.requestPasswordReset(
+        email: 'demo@ticketmaster.mw',
+      );
+
+      expect(code, '123456');
+      await service.resetPassword(
+        email: 'DEMO@ticketmaster.mw',
+        code: code,
+        newPassword: 'newPass123!',
+      );
+
+      expect(
+        await service.logIn(
+          email: 'demo@ticketmaster.mw',
+          password: 'newPass123!',
+        ),
+        isA<AppUser>(),
+      );
+      await expectLater(
+        service.logIn(email: 'demo@ticketmaster.mw', password: 'demo1234'),
+        throwsA(isA<AuthException>()),
+      );
+      await expectLater(
+        service.resetPassword(
+          email: 'demo@ticketmaster.mw',
+          code: code,
+          newPassword: 'otherPass456!',
+        ),
+        throwsA(isA<AuthException>()),
+      );
+    });
+
+    test('rejects incorrect and expired reset codes', () async {
+      var now = DateTime(2026, 11, 5);
+      final service = FakeAuthService(
+        clock: () => now,
+        resetCodeGenerator: () => '123456',
+      );
+      await service.requestPasswordReset(email: 'demo@ticketmaster.mw');
+
+      await expectLater(
+        service.resetPassword(
+          email: 'demo@ticketmaster.mw',
+          code: '000000',
+          newPassword: 'newPass123!',
+        ),
+        throwsA(
+          isA<AuthException>().having(
+            (exception) => exception.message,
+            'message',
+            'Incorrect verification code. Please try again.',
+          ),
+        ),
+      );
+
+      now = now.add(const Duration(minutes: 10));
+      await expectLater(
+        service.resetPassword(
+          email: 'demo@ticketmaster.mw',
+          code: '123456',
+          newPassword: 'newPass123!',
+        ),
+        throwsA(
+          isA<AuthException>().having(
+            (exception) => exception.message,
+            'message',
+            'Verification code has expired. Request a new one.',
+          ),
+        ),
+      );
+    });
+
+    test('does not issue reset codes for unknown accounts', () async {
+      await expectLater(
+        service.requestPasswordReset(email: 'unknown@example.com'),
+        throwsA(
+          isA<AuthException>().having(
+            (exception) => exception.message,
+            'message',
+            'No account was found for this email address.',
+          ),
+        ),
+      );
+    });
+
     test(
       'rejects an unknown email with the same message as a wrong password',
       () async {
