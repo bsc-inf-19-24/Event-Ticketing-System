@@ -22,13 +22,21 @@ bool hasSymbol(String v) => RegExp(r'[^A-Za-z0-9\s]').hasMatch(v);
 
 /// Used on SIGN UP only (existing users just need a non-empty password to log in).
 String? validateNewPassword(String? value) {
-  if (value == null || value.isEmpty) return 'Please enter a password';
+  if (value == null || value.isEmpty) {
+    return 'Please enter a password';
+  }
   if (!hasMinLength(value)) {
     return 'Password must be at least $kMinPasswordLength characters';
   }
-  if (!hasLetter(value)) return 'Password must include a letter';
-  if (!hasNumber(value)) return 'Password must include a number';
-  if (!hasSymbol(value)) return 'Password must include a symbol (e.g. @ # \$ !)';
+  if (!hasLetter(value)) {
+    return 'Password must include a letter';
+  }
+  if (!hasNumber(value)) {
+    return 'Password must include a number';
+  }
+  if (!hasSymbol(value)) {
+    return 'Password must include a symbol (e.g. @ # \$ !)';
+  }
   return null;
 }
 
@@ -109,7 +117,11 @@ class AuthHeading extends StatelessWidget {
 class PrimaryButton extends StatelessWidget {
   final String label;
   final VoidCallback onPressed;
-  const PrimaryButton({super.key, required this.label, required this.onPressed});
+  const PrimaryButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -139,8 +151,10 @@ class OrDivider extends StatelessWidget {
         Expanded(child: Divider(color: Color(0xFFE0E0E0))),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 12),
-          child: Text('or',
-              style: TextStyle(color: Colors.black45, fontSize: 13)),
+          child: Text(
+            'or',
+            style: TextStyle(color: Colors.black45, fontSize: 13),
+          ),
         ),
         Expanded(child: Divider(color: Color(0xFFE0E0E0))),
       ],
@@ -187,8 +201,10 @@ class GoogleButton extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            const Text('Continue with Google',
-                style: TextStyle(fontWeight: FontWeight.w500)),
+            const Text(
+              'Continue with Google',
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
           ],
         ),
       ),
@@ -214,8 +230,10 @@ class SwitchAuthRow extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Flexible(
-          child: Text(question,
-              style: const TextStyle(color: Colors.black54, fontSize: 13)),
+          child: Text(
+            question,
+            style: const TextStyle(color: Colors.black54, fontSize: 13),
+          ),
         ),
         TextButton(
           onPressed: onPressed,
@@ -223,8 +241,10 @@ class SwitchAuthRow extends StatelessWidget {
             foregroundColor: Colors.black,
             padding: const EdgeInsets.symmetric(horizontal: 6),
           ),
-          child: Text(actionLabel,
-              style: const TextStyle(fontWeight: FontWeight.w700)),
+          child: Text(
+            actionLabel,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
         ),
       ],
     );
@@ -247,11 +267,13 @@ class PasswordRequirements extends StatelessWidget {
             color: ok ? Colors.green : Colors.black38,
           ),
           const SizedBox(width: 8),
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 12.5,
-              color: ok ? Colors.green.shade700 : Colors.black54,
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12.5,
+                color: ok ? Colors.green.shade700 : Colors.black54,
+              ),
             ),
           ),
         ],
@@ -266,7 +288,10 @@ class PasswordRequirements extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _row('At least $kMinPasswordLength characters', hasMinLength(password)),
+          _row(
+            'At least $kMinPasswordLength characters',
+            hasMinLength(password),
+          ),
           _row('Contains a letter (a-z)', hasLetter(password)),
           _row('Contains a number (0-9)', hasNumber(password)),
           _row('Contains a symbol (! @ # \$ % ...)', hasSymbol(password)),

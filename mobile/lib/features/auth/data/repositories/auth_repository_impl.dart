@@ -1,7 +1,9 @@
 //implements repository interface
 import '../../../../core/storage/secure_storage.dart';
 import '../../domain/repositories/auth_repository.dart';
+import '../../domain/entities/password_reset_request.dart';
 import '../datasources/auth_remote_datasource.dart';
+
 import 'package:mobile/features/auth/data/model/user_model.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
@@ -24,5 +26,23 @@ class AuthRepositoryImpl implements AuthRepository {
     }
 
     return userModel;
+  }
+
+  @override
+  Future<PasswordResetRequest> requestPasswordReset(String email) {
+    return remoteDataSource.requestPasswordReset(email);
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) {
+    return remoteDataSource.resetPassword(
+      email: email,
+      code: code,
+      newPassword: newPassword,
+    );
   }
 }
