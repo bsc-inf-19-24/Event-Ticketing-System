@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../core/api_config.dart';
+import '../features/auth/data/presentation/provider/auth_provider.dart';
 import 'privacy_policy_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -10,7 +13,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
- // bool _darkMode = false;
+  // bool _darkMode = false;
   bool _notificationsEnabled = true;
   String _selectedLanguage = 'English';
 
@@ -22,7 +25,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(16.0),
         children: [
           _buildSectionHeader('Preferences'),
-           /**
+          /**
           // Dark Mode Switch
           SwitchListTile(
             title: const Text('Dark Mode'),
@@ -109,6 +112,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const Divider(height: 32),
           _buildSectionHeader('Support & About'),
 
+          ListTile(
+            leading: const Icon(Icons.dns_outlined),
+            title: const Text('Server connection'),
+            subtitle: Text(ApiConfig.baseUrl),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _showServerSettingsDialog,
+          ),
+
           // Help & Support
           ListTile(
             leading: const Icon(Icons.help_outline),
@@ -169,6 +180,77 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _showServerSettingsDialog() async {
+    final controller = TextEditingController(text: ApiConfig.baseUrl);
+    String? errorMessage;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Server connection'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Enter the server base URL without an /api suffix.'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.url,
+                decoration: InputDecoration(
+                  labelText: 'Server URL',
+                  hintText: 'https://example.com',
+                  errorText: errorMessage,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                try {
+                  await ApiConfig.resetBaseUrl();
+                  controller.text = ApiConfig.baseUrl;
+                  setDialogState(() => errorMessage = null);
+                } on Exception catch (error) {
+                  setDialogState(() => errorMessage = error.toString());
+                }
+              },
+              child: const Text('Use default'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                try {
+                  await ApiConfig.setBaseUrl(controller.text);
+                  if (dialogContext.mounted && mounted) {
+                    Navigator.of(dialogContext).pop();
+                    ScaffoldMessenger.of(this.context).showSnackBar(
+                      const SnackBar(content: Text('Server URL saved.')),
+                    );
+                  }
+                } on Exception catch (error) {
+                  setDialogState(
+                    () => errorMessage = error.toString().replaceFirst(
+                      'FormatException: ',
+                      '',
+                    ),
+                  );
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
+    if (mounted) setState(() {});
   }
 
   // Section Header Helper
@@ -258,7 +340,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Log Out'),
           content: const Text(
@@ -270,9 +352,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: const Text('Cancel'),
             ),
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                // TODO: Execute sign-out logic
+              onPressed: () async {
+                final auth = dialogContext.read<AuthProvider>();
+                Navigator.of(dialogContext).pop();
+                try {
+                  await auth.logout();
+                } catch (error) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(this.context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          error.toString().replaceFirst('Exception: ', ''),
+                        ),
+                      ),
+                    );
+                  }
+                }
               },
               child: const Text('Log Out', style: TextStyle(color: Colors.red)),
             ),

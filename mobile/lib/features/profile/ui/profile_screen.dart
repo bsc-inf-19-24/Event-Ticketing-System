@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:mobile/features/auth/data/presentation/provider/auth_provider.dart';
 import 'package:mobile/features/auth/logic/auth_controller.dart';
 import 'package:mobile/theme/app_colors.dart';
 import 'package:mobile/widgets/login_required_view.dart';
@@ -19,6 +21,9 @@ class ProfileScreen extends StatelessWidget {
       listenable: authController,
       builder: (context, _) {
         if (!authController.isLoggedIn) {
+          final sessionRestoreError = context
+              .watch<AuthProvider>()
+              .sessionRestoreError;
           return Scaffold(
             backgroundColor: AppColors.background,
             appBar: AppBar(
@@ -33,9 +38,51 @@ class ProfileScreen extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            body: const LoginRequiredView(
-              title: 'Log in to view your profile',
-              message: 'You need an account to manage your profile.',
+            body: Column(
+              children: [
+                const Expanded(
+                  child: LoginRequiredView(
+                    title: 'Log in to view your profile',
+                    message: 'You need an account to manage your profile.',
+                  ),
+                ),
+                if (sessionRestoreError != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
+                      children: [
+                        Text(
+                          sessionRestoreError,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                        TextButton.icon(
+                          onPressed: () async {
+                            await context.read<AuthProvider>().restoreSession();
+                          },
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ListTile(
+                  leading: const Icon(Icons.settings_outlined),
+                  title: const Text(
+                    'Settings',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  trailing: const Icon(
+                    Icons.chevron_right,
+                    color: Colors.white70,
+                  ),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
             ),
           );
         }
@@ -78,7 +125,10 @@ class ProfileScreen extends StatelessWidget {
             // Main Body Content
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24.0,
+                  vertical: 8.0,
+                ),
                 child: Column(
                   children: [
                     // Profile Header Card (Avatar + Email)
@@ -93,7 +143,8 @@ class ProfileScreen extends StatelessWidget {
                     // Menu List Items
                     ProfileMenuItem(
                       title: 'Settings',
-                      showChevron: true, // Shows the right arrow icon matching prototype
+                      showChevron:
+                          true, // Shows the right arrow icon matching prototype
                       onTap: () {
                         Navigator.push(
                           context,
@@ -140,14 +191,31 @@ class ProfileScreen extends StatelessWidget {
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
-                          foregroundColor: const Color(0xFFE53935), // Red text color for logout
+                          foregroundColor: const Color(
+                            0xFFE53935,
+                          ), // Red text color for logout
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(24.0),
                           ),
                         ),
-                        onPressed: () {
-                          authController.logOut();
+                        onPressed: () async {
+                          try {
+                            await context.read<AuthProvider>().logout();
+                          } catch (error) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    error.toString().replaceFirst(
+                                      'Exception: ',
+                                      '',
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                          }
                         },
                         child: const Text(
                           'Log Out',
