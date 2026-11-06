@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:mobile/features/auth/logic/auth_controller.dart';
+
 import '../data/profile_repository.dart';
 import '../models/user_model.dart';
 
@@ -38,6 +40,7 @@ class ProfileController extends ChangeNotifier {
       notifyListeners();
 
       await _repository.logout();
+      authController.logOut();
 
       _isLoading = false;
       notifyListeners();
