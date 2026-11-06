@@ -10,6 +10,7 @@ class Ticket {
   final int price;
   final String purchasedOn;
   final String imagePath;
+  final String downloadedAt;
 
   const Ticket({
     required this.id,
@@ -22,6 +23,7 @@ class Ticket {
     this.price = 0,
     this.purchasedOn = '',
     this.imagePath = '',
+    this.downloadedAt = '',
   });
 
   Map<String, dynamic> toJson() => {
@@ -35,6 +37,7 @@ class Ticket {
     'price': price,
     'purchasedOn': purchasedOn,
     'imagePath': imagePath,
+    'downloadedAt': downloadedAt,
   };
 
   factory Ticket.fromJson(Map<String, dynamic> json) {
@@ -49,6 +52,7 @@ class Ticket {
       price: (json['price'] as num?)?.toInt() ?? 0,
       purchasedOn: (json['purchasedOn'] as String?) ?? '',
       imagePath: (json['imagePath'] as String?) ?? '',
+      downloadedAt: (json['downloadedAt'] as String?) ?? '',
     );
   }
 }
