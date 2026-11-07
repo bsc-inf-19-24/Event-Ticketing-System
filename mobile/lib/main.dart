@@ -8,6 +8,7 @@ import 'package:mobile/screens/main_shell.dart';
 import 'core/api_config.dart';
 import 'core/network/api_client.dart';
 import 'core/storage/secure_storage.dart';
+import 'features/tickets/logic/connectivity_monitor.dart';
 
 // Authentication feature imports
 import 'features/auth/data/datasources/auth_remote_datasource.dart';
@@ -20,6 +21,11 @@ import 'features/auth/logic/auth_controller.dart';
 import 'features/auth/domain/repositories/auth_repository.dart';
 import 'features/auth/domain/usecases/register_usecase.dart';
 
+const apiBaseUrl = String.fromEnvironment('API_BASE_URL');
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await connectivityMonitor.start();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ApiConfig.load();
@@ -28,6 +34,11 @@ Future<void> main() async {
   final apiAuthService = ApiAuthService(apiClient: apiClient);
   final AuthRemoteDataSource remoteDataSource = ApiConfig.useFakeAuth
       ? MockAuthRemoteDataSource(authService: fakeAuthService)
+      : AuthRemoteDataSourceImpl(
+          apiClient: ApiClient(
+            baseUrl: apiBaseUrl.replaceFirst(RegExp(r'/+$'), ''),
+          ),
+        );
       : apiAuthService;
 
   apiClient.tokenProvider = secureStorage.getToken;

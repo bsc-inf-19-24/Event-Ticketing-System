@@ -138,7 +138,7 @@ void main() {
     () async {
       final auth = AuthController(FakeAuthService());
       await auth.logIn('demo@ticketmaster.mw', 'demo1234');
-      final storage = TicketStorage();
+      final storage = _MemoryTicketStorage();
       final tickets = TicketsController(storage: storage, auth: auth);
       await tickets.load();
       final repository = OrderRepository(
@@ -350,7 +350,7 @@ void main() {
     'TicketsController clears on logout and filters tickets by user',
     () async {
       final auth = AuthController(FakeAuthService());
-      final storage = TicketStorage();
+      final storage = _MemoryTicketStorage();
       await storage.saveTickets([
         _ticket(id: 'TM-000001', userId: 'U-001'),
         _ticket(id: 'TM-000002', userId: 'U-002'),
