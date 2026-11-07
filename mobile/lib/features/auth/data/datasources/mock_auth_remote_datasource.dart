@@ -1,11 +1,10 @@
 import '../../../../core/network/api_client.dart';
-
-import 'package:mobile/features/auth/data/model/user_model.dart';
-import 'package:mobile/features/auth/services/fake_auth_service.dart';
-import 'package:mobile/features/auth/services/auth_service.dart';
-
-import 'auth_remote_datasource.dart';
 import '../../domain/entities/password_reset_request.dart';
+import '../../models/app_user.dart';
+import '../../services/auth_service.dart';
+import '../../services/fake_auth_service.dart';
+import '../model/user_model.dart';
+import 'auth_remote_datasource.dart';
 
 class MockAuthRemoteDataSource implements AuthRemoteDataSource {
   MockAuthRemoteDataSource({FakeAuthService? authService})
@@ -13,6 +12,14 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
 
   final FakeAuthService _authService;
   UserModel? _currentUser;
+
+  UserModel _asModel(AppUser user) => UserModel(
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    token: 'mock_access_${DateTime.now().microsecondsSinceEpoch}',
+    refreshToken: 'mock_refresh_token',
+  );
 
   @override
   Future<UserModel> register({
@@ -27,52 +34,35 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
         email: email,
         password: password,
       );
-      _currentUser = UserModel(
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        token: 'mock_jwt_secure_token_${DateTime.now().millisecondsSinceEpoch}',
-        refreshToken: 'mock_refresh_token',
-      );
-      return _currentUser!;
-    } on AuthException catch (exception) {
-      throw ApiException(exception.message, 400);
+      return _currentUser = _asModel(user);
+    } on AuthException catch (error) {
+      throw ApiException(error.message, 400);
     }
   }
 
   @override
   Future<UserModel> login(String email, String password) async {
     try {
-      final user = await _authService.logIn(email: email, password: password);
-      _currentUser = UserModel(
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        token: 'mock_jwt_secure_token_${DateTime.now().millisecondsSinceEpoch}',
-        refreshToken: 'mock_refresh_token',
+      return _currentUser = _asModel(
+        await _authService.logIn(email: email, password: password),
       );
-      return _currentUser!;
-    } on AuthException {
-      throw ApiException('Invalid email or password. Please try again.', 401);
+    } on AuthException catch (error) {
+      throw ApiException(error.message, 401);
     }
   }
 
   @override
-  Future<UserModel> loginWithGoogle(String idToken) async {
-    throw ApiException(
-      'Google sign-in requires a configured backend. Set API_BASE_URL and configure POST /auth/google.',
-      501,
-  Future<UserModel> loginWithGoogle(String idToken) {
-    throw const ApiException('Google sign-in is unavailable in demo mode.');
-  }
+  Future<UserModel> loginWithGoogle(String idToken) => Future<UserModel>.error(
+    const ApiException('Google sign-in is unavailable in demo mode.', 501),
+  );
 
   @override
   Future<UserModel> getCurrentProfile() async {
-    final user = _currentUser;
-    if (user == null) {
-      throw ApiException('No signed-in demo user is available.', 401);
+    final current = _currentUser;
+    if (current == null) {
+      throw const ApiException('No signed-in demo user is available.', 401);
     }
-    return user;
+    return current;
   }
 
   @override
@@ -81,8 +71,7 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
       throw const ApiException('The refresh token is invalid.', 401);
     }
     return AuthTokens(
-      accessToken:
-          'mock_jwt_secure_token_${DateTime.now().millisecondsSinceEpoch}',
+      accessToken: 'mock_access_${DateTime.now().microsecondsSinceEpoch}',
       refreshToken: refreshToken,
     );
   }
@@ -92,13 +81,11 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
     try {
       final code = await _authService.requestPasswordReset(email: email);
       return PasswordResetRequest(
-        message:
-            'A reset code was created for your account. Demo mode does not '
-            'send email; use the code shown below.',
+        message: 'Demo reset code created. Use the code shown below.',
         demoVerificationCode: code,
       );
-    } on AuthException catch (exception) {
-      throw ApiException(exception.message, 404);
+    } on AuthException catch (error) {
+      throw ApiException(error.message, 404);
     }
   }
 
@@ -114,8 +101,8 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
         code: code,
         newPassword: newPassword,
       );
-    } on AuthException catch (exception) {
-      throw ApiException(exception.message, 400);
+    } on AuthException catch (error) {
+      throw ApiException(error.message, 400);
     }
   }
 }

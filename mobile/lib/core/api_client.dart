@@ -33,8 +33,8 @@ class ApiClient {
   Future<void> Function()? onUnauthorized;
   static const _requestTimeout = Duration(seconds: 15);
 
-  Future<dynamic> get(String endpoint) =>
-      _send('GET', endpoint, null, authenticated: true);
+  Future<dynamic> get(String endpoint, {String? token}) =>
+      _send('GET', endpoint, null, authenticated: true, suppliedToken: token);
 
   Future<Uint8List> getBytes(
     String endpoint, {
@@ -57,8 +57,12 @@ class ApiClient {
     return response.bodyBytes;
   }
 
-  Future<dynamic> post(String endpoint, [Map<String, dynamic>? body]) =>
-      _send('POST', endpoint, body, authenticated: true);
+  Future<dynamic> post(
+    String endpoint,
+    Map<String, dynamic>? body, {
+    String? token,
+  }) =>
+      _send('POST', endpoint, body, authenticated: true, suppliedToken: token);
 
   Future<dynamic> postUnauthenticated(
     String endpoint, [
@@ -88,8 +92,11 @@ class ApiClient {
     Map<String, dynamic>? body, {
     required bool authenticated,
     bool allowTokenRefresh = true,
+    String? suppliedToken,
   }) async {
-    final token = authenticated ? await tokenProvider?.call() : null;
+    final token = authenticated
+        ? suppliedToken ?? await tokenProvider?.call()
+        : null;
     var response = await _request(method, endpoint, body, token);
 
     if (response.statusCode == 401 && authenticated && allowTokenRefresh) {

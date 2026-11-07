@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as path;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:sqflite/sqflite.dart';
 
 import 'package:mobile/models/ticket.dart';
 import 'package:mobile/services/ticket_repository.dart';
@@ -26,6 +25,7 @@ void main() {
       status: 'Confirmed',
       qrData: 'qr-ticket-1',
       price: 2500,
+      userId: 'test-user',
     );
     final storage = TicketStorage(databaseName: databaseName);
 
@@ -45,6 +45,7 @@ void main() {
         status: ticket.status,
         qrData: ticket.qrData,
         price: ticket.price,
+        userId: 'test-user',
       ),
     );
     expect((await storage.getSavedTickets()), hasLength(1));
@@ -54,9 +55,8 @@ void main() {
     final reopenedStorage = TicketStorage(databaseName: databaseName);
     expect((await reopenedStorage.getTicket(ticket.id))!.qrData, ticket.qrData);
 
-    final offlineTickets = await TicketRepository(
-      storage: reopenedStorage,
-    ).load(hasConnection: false);
+    final offlineTickets = await TicketRepository(storage: reopenedStorage)
+        .load(userId: 'test-user', hasConnection: false);
     expect(offlineTickets.isOffline, isTrue);
     expect(offlineTickets.savedIds, contains(ticket.id));
     expect(offlineTickets.tickets.single.qrData, ticket.qrData);
@@ -70,6 +70,7 @@ void main() {
         status: 'Used',
         qrData: ticket.qrData,
         price: 3000,
+        userId: 'test-user',
       ),
     );
     final updated = (await reopenedStorage.getTicket(ticket.id))!;
@@ -84,11 +85,6 @@ void main() {
       path.join(await getDatabasesPath(), databaseName),
     );
   });
-}
-import 'package:mobile/models/ticket.dart';
-import 'package:mobile/services/ticket_storage.dart';
-
-void main() {
   test('SQLite ticket sync updates and isolates records by user', () async {
     final storage = TicketStorage(databasePath: ':memory:');
     final firstUserTicket = _ticket('ticket-1', 'user-1');

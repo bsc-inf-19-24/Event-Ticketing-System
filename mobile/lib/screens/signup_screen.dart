@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:provider/provider.dart';
-import 'package:mobile/features/auth/data/presentation/provider/auth_provider.dart';
 
 import '../features/auth/data/presentation/provider/auth_provider.dart';
 import 'auth_common.dart';
@@ -14,6 +13,9 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
+  // Every new account is a customer.
+  static const String _defaultRole = 'CUSTOMER';
+
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -22,7 +24,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  String _selectedRole = 'CUSTOMER';
 
   @override
   void dispose() {
@@ -42,7 +43,7 @@ class _SignupScreenState extends State<SignupScreen> {
       name: _nameController.text.trim(),
       email: _emailController.text.trim(),
       password: _passwordController.text,
-      role: _selectedRole,
+      role: _defaultRole,
     );
     if (!mounted) return;
 
@@ -165,36 +166,6 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                     const SizedBox(height: 14),
 
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedRole,
-                      decoration: authFieldDecoration(
-                        label: 'Account type',
-                        hint: 'Choose an account type',
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'CUSTOMER',
-                          child: Text('Customer'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'ORGANIZER',
-                          child: Text('Organizer'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'VALIDATOR',
-                          child: Text('Validator'),
-                        ),
-                      ],
-                      onChanged: auth.isLoading
-                          ? null
-                          : (role) {
-                              if (role != null) {
-                                setState(() => _selectedRole = role);
-                              }
-                            },
-                    ),
-                    const SizedBox(height: 14),
-
                     TextFormField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
@@ -205,8 +176,8 @@ class _SignupScreenState extends State<SignupScreen> {
                         hint: 'Create a password',
                         suffixIcon: _eyeButton(
                           _obscurePassword,
-                          () => setState(
-                            () => _obscurePassword = !_obscurePassword,
+                              () => setState(
+                                () => _obscurePassword = !_obscurePassword,
                           ),
                         ),
                       ),
@@ -225,9 +196,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         hint: 'Re-enter your password',
                         suffixIcon: _eyeButton(
                           _obscureConfirmPassword,
-                          () => setState(
-                            () => _obscureConfirmPassword =
-                                !_obscureConfirmPassword,
+                              () => setState(
+                                () => _obscureConfirmPassword =
+                            !_obscureConfirmPassword,
                           ),
                         ),
                       ),
@@ -246,9 +217,9 @@ class _SignupScreenState extends State<SignupScreen> {
                     auth.isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : PrimaryButton(
-                            label: 'Create account',
-                            onPressed: _onSignupPressed,
-                          ),
+                      label: 'Create account',
+                      onPressed: _onSignupPressed,
+                    ),
                     const SizedBox(height: 20),
                     const OrDivider(),
                     const SizedBox(height: 20),

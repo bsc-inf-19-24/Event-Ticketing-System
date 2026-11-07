@@ -1,7 +1,6 @@
 import '../../../../core/network/api_client.dart';
 import '../../domain/entities/password_reset_request.dart';
-
-import 'package:mobile/features/auth/data/model/user_model.dart';
+import '../model/user_model.dart';
 
 abstract class AuthRemoteDataSource {
   Future<UserModel> register({
@@ -23,13 +22,13 @@ abstract class AuthRemoteDataSource {
 }
 
 class ApiAuthService implements AuthRemoteDataSource {
-  final ApiClient apiClient;
-
   ApiAuthService({required this.apiClient});
 
-  Map<String, dynamic> _responseMap(dynamic response) {
-    if (response is Map<String, dynamic>) return response;
-    if (response is Map) return Map<String, dynamic>.from(response);
+  final ApiClient apiClient;
+
+  Map<String, dynamic> _map(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
     throw const ApiException('The server returned an invalid response.');
   }
 
@@ -39,83 +38,71 @@ class ApiAuthService implements AuthRemoteDataSource {
     required String email,
     required String password,
     required String role,
-  }) async {
-    final response = await apiClient.postUnauthenticated('/api/auth/register', {
-      'name': name.trim(),
-      'email': email.trim(),
-      'password': password,
-      'role': role,
-    });
-    return UserModel.fromJson(_responseMap(response));
-  }
+  }) async => UserModel.fromJson(
+    _map(
+      await apiClient.postUnauthenticated('/api/auth/register', {
+        'name': name.trim(),
+        'email': email.trim(),
+        'password': password,
+        'role': role,
+      }),
+    ),
+  );
 
   @override
-  Future<UserModel> login(String email, String password) async {
-    final responseData = await apiClient.postUnauthenticated(
-      '/api/auth/login',
-      {'email': email.trim(), 'password': password},
-    );
-
-    return UserModel.fromJson(_responseMap(responseData));
-  }
+  Future<UserModel> login(String email, String password) async =>
+      UserModel.fromJson(
+        _map(
+          await apiClient.postUnauthenticated('/api/auth/login', {
+            'email': email.trim(),
+            'password': password,
+          }),
+        ),
+      );
 
   @override
   Future<UserModel> loginWithGoogle(String idToken) async {
     if (idToken.trim().isEmpty) {
-      throw ApiException('Google did not return an ID token.');
+      throw const ApiException('Google did not return an ID token.');
     }
-    final responseData = await apiClient.post('/auth/google', {
-      'idToken': idToken,
-    });
-    return UserModel.fromJson(responseData);
-  }
-
-  @override
-  Future<PasswordResetRequest> requestPasswordReset(String email) async {
-    final responseData = await apiClient.post('/auth/forgot-password', {
-      'email': email.trim(),
-    final response = await apiClient.postUnauthenticated('/api/auth/google', {
-      'idToken': idToken,
-    });
-    return UserModel.fromJson(_responseMap(response));
-  }
-
-  Future<List<int>> generateQrImage(String text) {
-    return apiClient.getBytes(
-      '/api/auth/qr/${Uri.encodeComponent(text)}',
-      authenticated: false,
+    return UserModel.fromJson(
+      _map(
+        await apiClient.postUnauthenticated('/api/auth/google', {
+          'idToken': idToken,
+        }),
+      ),
     );
   }
 
-  @override
-  Future<UserModel> getCurrentProfile() async {
-    final response = await apiClient.get('/api/customers/me');
-    return UserModel.fromJson(_responseMap(response));
-  }
+  Future<List<int>> generateQrImage(String text) => apiClient.getBytes(
+    '/api/auth/qr/${Uri.encodeComponent(text)}',
+    authenticated: false,
+  );
 
   @override
-  Future<AuthTokens> refreshTokens(String refreshToken) async {
-    final response = await apiClient.postWithoutRefresh('/api/auth/refresh', {
-      'refreshToken': refreshToken,
-    });
-    try {
-      return AuthTokens.fromJson(_responseMap(response));
-    } on FormatException catch (error) {
-      throw ApiException(error.message);
-    }
-  }
+  Future<UserModel> getCurrentProfile() async =>
+      UserModel.fromJson(_map(await apiClient.get('/api/customers/me')));
+
+  @override
+  Future<AuthTokens> refreshTokens(String refreshToken) async =>
+      AuthTokens.fromJson(
+        _map(
+          await apiClient.postWithoutRefresh('/api/auth/refresh', {
+            'refreshToken': refreshToken,
+          }),
+        ),
+      );
 
   @override
   Future<PasswordResetRequest> requestPasswordReset(String email) async {
-    final responseData = await apiClient.postUnauthenticated(
-      '/api/auth/forgot-password',
-      {'email': email.trim()},
+    final response = _map(
+      await apiClient.postUnauthenticated('/api/auth/forgot-password', {
+        'email': email.trim(),
+      }),
     );
-    final body = _responseMap(responseData);
-
     return PasswordResetRequest(
-      message: body['message'] is String
-          ? body['message'] as String
+      message: response['message'] is String
+          ? response['message'] as String
           : 'If an account exists, a verification code has been sent.',
     );
   }
