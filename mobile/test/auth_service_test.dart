@@ -3,6 +3,8 @@ import 'package:mobile/features/auth/logic/auth_controller.dart';
 import 'package:mobile/features/auth/models/app_user.dart';
 import 'package:mobile/features/auth/services/auth_service.dart';
 import 'package:mobile/features/auth/services/fake_auth_service.dart';
+import 'package:mobile/core/network/api_client.dart';
+import 'package:mobile/features/auth/data/datasources/mock_auth_remote_datasource.dart';
 
 void main() {
   late FakeAuthService service;
@@ -12,6 +14,36 @@ void main() {
   });
 
   group('FakeAuthService', () {
+    test(
+      'accepts each documented demo account through the app data source',
+      () async {
+        final dataSource = MockAuthRemoteDataSource(authService: service);
+        final credentials = {
+          'demo@ticketmaster.mw': 'demo1234',
+          'test.customer@example.com': 'SecurePassword123!',
+          'admin@example.com': 'password123',
+        };
+
+        for (final entry in credentials.entries) {
+          final user = await dataSource.login(entry.key, entry.value);
+          expect(user.email, entry.key);
+        }
+      },
+    );
+
+    test('rejects unknown accounts and incorrect passwords through the app data source', () async {
+      final dataSource = MockAuthRemoteDataSource(authService: service);
+
+      await expectLater(
+        dataSource.login('unknown@example.com', 'anything123'),
+        throwsA(isA<ApiException>()),
+      );
+      await expectLater(
+        dataSource.login('demo@ticketmaster.mw', 'wrongpass'),
+        throwsA(isA<ApiException>()),
+      );
+    });
+
     test('logs in with the seeded demo account', () async {
       final user = await service.logIn(
         email: 'demo@ticketmaster.mw',
@@ -36,6 +68,93 @@ void main() {
             (exception) => exception.message,
             'message',
             'Incorrect email or password.',
+          ),
+        ),
+      );
+    });
+
+    test('resets a password with a valid one-time verification code', () async {
+      final service = FakeAuthService(resetCodeGenerator: () => '123456');
+      final code = await service.requestPasswordReset(
+        email: 'demo@ticketmaster.mw',
+      );
+
+      expect(code, '123456');
+      await service.resetPassword(
+        email: 'DEMO@ticketmaster.mw',
+        code: code,
+        newPassword: 'newPass123!',
+      );
+
+      expect(
+        await service.logIn(
+          email: 'demo@ticketmaster.mw',
+          password: 'newPass123!',
+        ),
+        isA<AppUser>(),
+      );
+      await expectLater(
+        service.logIn(email: 'demo@ticketmaster.mw', password: 'demo1234'),
+        throwsA(isA<AuthException>()),
+      );
+      await expectLater(
+        service.resetPassword(
+          email: 'demo@ticketmaster.mw',
+          code: code,
+          newPassword: 'otherPass456!',
+        ),
+        throwsA(isA<AuthException>()),
+      );
+    });
+
+    test('rejects incorrect and expired reset codes', () async {
+      var now = DateTime(2026, 11, 5);
+      final service = FakeAuthService(
+        clock: () => now,
+        resetCodeGenerator: () => '123456',
+      );
+      await service.requestPasswordReset(email: 'demo@ticketmaster.mw');
+
+      await expectLater(
+        service.resetPassword(
+          email: 'demo@ticketmaster.mw',
+          code: '000000',
+          newPassword: 'newPass123!',
+        ),
+        throwsA(
+          isA<AuthException>().having(
+            (exception) => exception.message,
+            'message',
+            'Incorrect verification code. Please try again.',
+          ),
+        ),
+      );
+
+      now = now.add(const Duration(minutes: 10));
+      await expectLater(
+        service.resetPassword(
+          email: 'demo@ticketmaster.mw',
+          code: '123456',
+          newPassword: 'newPass123!',
+        ),
+        throwsA(
+          isA<AuthException>().having(
+            (exception) => exception.message,
+            'message',
+            'Verification code has expired. Request a new one.',
+          ),
+        ),
+      );
+    });
+
+    test('does not issue reset codes for unknown accounts', () async {
+      await expectLater(
+        service.requestPasswordReset(email: 'unknown@example.com'),
+        throwsA(
+          isA<AuthException>().having(
+            (exception) => exception.message,
+            'message',
+            'No account was found for this email address.',
           ),
         ),
       );
@@ -81,7 +200,7 @@ void main() {
         password: 'newpass123',
       );
 
-      expect(createdUser.id, 'U-002');
+      expect(createdUser.id, 'U-004');
       expect(createdUser.email, 'new@ticketmaster.mw');
       expect(loggedInUser, createdUser);
     });

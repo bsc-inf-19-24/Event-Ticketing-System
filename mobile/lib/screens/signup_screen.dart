@@ -1,189 +1,284 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:provider/provider.dart';
 
-class SignUpScreen extends StatefulWidget {
-  const SignUpScreen({super.key});
+import '../features/auth/data/presentation/provider/auth_provider.dart';
+import 'auth_common.dart';
+
+class SignupScreen extends StatefulWidget {
+  const SignupScreen({super.key});
 
   @override
-  State<SignUpScreen> createState() => _SignUpScreenState();
+  State<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _SignUpScreenState extends State<SignUpScreen> {
-  final TextEditingController _emailController = TextEditingController();
+class _SignupScreenState extends State<SignupScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+  String _selectedRole = 'CUSTOMER';
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  // ---- Placeholder handlers ----
-  void _onContinuePressed() {
-    Fluttertoast.showToast(msg: 'Login pressed');
+  Future<void> _onSignupPressed() async {
+    FocusScope.of(context).unfocus();
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    final auth = context.read<AuthProvider>();
+    final success = await auth.register(
+      name: _nameController.text.trim(),
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+      role: _selectedRole,
+    );
+    if (!mounted) return;
+
+    if (success) {
+      Fluttertoast.showToast(msg: 'Account created successfully.');
+      Navigator.of(context).pop(true);
+    } else {
+      Fluttertoast.showToast(msg: auth.errorMessage ?? 'Sign-up failed.');
+    }
   }
 
   void _onGooglePressed() {
-    Fluttertoast.showToast(msg: 'Google login pressed');
+    Fluttertoast.showToast(msg: 'Google sign-up is not connected yet.');
+  }
+
+  Widget _eyeButton(bool obscured, VoidCallback onTap) {
+    return IconButton(
+      tooltip: obscured ? 'Show password' : 'Hide password',
+      icon: Icon(
+        obscured ? Icons.visibility_off : Icons.visibility,
+        color: Colors.black54,
+      ),
+      onPressed: onTap,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Logo
-                const Icon(Icons.confirmation_number,
-                    size: 80, color: Colors.black),
-                const SizedBox(height: 8),
-                const Text(
-                  'TICKET MASTER',
-                  style: TextStyle(
-                    fontFamily: 'serif',
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 56),
-
-                // Heading
-                const Text(
-                  'Create an account',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Enter your email to sign up for this app',
-                  style: TextStyle(fontSize: 14, color: Colors.black87),
-                ),
-                const SizedBox(height: 20),
-
-                // Email field
-                TextField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    hintText: 'email@domain.com',
-                    hintStyle: const TextStyle(color: Colors.black38),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 14),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const AuthLogo(),
+                    const SizedBox(height: 32),
+                    const AuthHeading(
+                      title: 'Create an account',
+                      subtitle: 'Enter your details to get started',
                     ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Colors.black),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // Continue button
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: _onContinuePressed,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    ),
-                    child: const Text('Continue',
-                        style: TextStyle(fontWeight: FontWeight.w500)),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Divider with "or"
-                Row(
-                  children: const [
-                    Expanded(child: Divider(color: Color(0xFFE0E0E0))),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      child: Text('or',
-                          style:
-                              TextStyle(color: Colors.black45, fontSize: 13)),
-                    ),
-                    Expanded(child: Divider(color: Color(0xFFE0E0E0))),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Google button
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: _onGooglePressed,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFEEEEEE),
-                      foregroundColor: Colors.black,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        ShaderMask(
-                          shaderCallback: (bounds) => const SweepGradient(
-                            colors: [
-                              Color(0xFF4285F4),
-                              Color(0xFF34A853),
-                              Color(0xFFFBBC05),
-                              Color(0xFFEA4335),
-                              Color(0xFF4285F4),
-                            ],
-                          ).createShader(bounds),
-                          child: const Text(
-                            'G',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
+                    const SizedBox(height: 24),
+                    if (auth.errorMessage != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          border: Border.all(color: Colors.red.shade200),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              auth.errorMessage!,
+                              style: TextStyle(
+                                color: Colors.red.shade800,
+                                fontSize: 13,
+                              ),
                             ),
+                            TextButton.icon(
+                              onPressed: _onSignupPressed,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    TextFormField(
+                      controller: _nameController,
+                      keyboardType: TextInputType.name,
+                      textCapitalization: TextCapitalization.words,
+                      textInputAction: TextInputAction.next,
+                      decoration: authFieldDecoration(
+                        label: 'Full Name',
+                        hint: 'Enter your name',
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Please enter your full name';
+                        }
+                        if (v.trim().length < 2) {
+                          return 'Name must contain at least 2 characters';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+
+                    TextFormField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      decoration: authFieldDecoration(
+                        label: 'Email Address',
+                        hint: 'email@domain.com',
+                      ),
+                      validator: validateEmail,
+                    ),
+                    const SizedBox(height: 14),
+
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedRole,
+                      decoration: authFieldDecoration(
+                        label: 'Account type',
+                        hint: 'Choose an account type',
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'CUSTOMER',
+                          child: Text('Customer'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'ORGANIZER',
+                          child: Text('Organizer'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'VALIDATOR',
+                          child: Text('Validator'),
+                        ),
+                      ],
+                      onChanged: auth.isLoading
+                          ? null
+                          : (role) {
+                              if (role != null) {
+                                setState(() => _selectedRole = role);
+                              }
+                            },
+                    ),
+                    const SizedBox(height: 14),
+
+                    TextFormField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      textInputAction: TextInputAction.next,
+                      onChanged: (_) => setState(() {}), // refresh checklist
+                      decoration: authFieldDecoration(
+                        label: 'Password',
+                        hint: 'Create a password',
+                        suffixIcon: _eyeButton(
+                          _obscurePassword,
+                          () => setState(
+                            () => _obscurePassword = !_obscurePassword,
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        const Text('Continue with Google',
-                            style: TextStyle(fontWeight: FontWeight.w500)),
-                      ],
+                      ),
+                      validator: validateNewPassword,
                     ),
-                  ),
-                ),
-                const SizedBox(height: 24),
+                    PasswordRequirements(password: _passwordController.text),
+                    const SizedBox(height: 14),
 
-                // Terms text
-                const Text.rich(
-                  TextSpan(
-                    style: TextStyle(fontSize: 12, color: Colors.black45),
-                    children: [
-                      TextSpan(text: 'By clicking continue, you agree to our '),
-                      TextSpan(
-                        text: 'Terms of Service',
-                        style: TextStyle(
-                            color: Colors.black, fontWeight: FontWeight.w500),
+                    TextFormField(
+                      controller: _confirmPasswordController,
+                      obscureText: _obscureConfirmPassword,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _onSignupPressed(),
+                      decoration: authFieldDecoration(
+                        label: 'Confirm Password',
+                        hint: 'Re-enter your password',
+                        suffixIcon: _eyeButton(
+                          _obscureConfirmPassword,
+                          () => setState(
+                            () => _obscureConfirmPassword =
+                                !_obscureConfirmPassword,
+                          ),
+                        ),
                       ),
-                      TextSpan(text: ' and '),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) {
+                          return 'Please confirm your password';
+                        }
+                        if (v != _passwordController.text) {
+                          return 'Passwords do not match';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+
+                    auth.isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : PrimaryButton(
+                            label: 'Create account',
+                            onPressed: _onSignupPressed,
+                          ),
+                    const SizedBox(height: 20),
+                    const OrDivider(),
+                    const SizedBox(height: 20),
+                    GoogleButton(onPressed: _onGooglePressed),
+                    const SizedBox(height: 20),
+
+                    SwitchAuthRow(
+                      question: 'Already have an account?',
+                      actionLabel: 'Log in',
+                      onPressed: () => Navigator.of(context).maybePop(),
+                    ),
+                    const SizedBox(height: 8),
+
+                    const Text.rich(
                       TextSpan(
-                        text: 'Privacy Policy',
-                        style: TextStyle(
-                            color: Colors.black, fontWeight: FontWeight.w500),
+                        style: TextStyle(fontSize: 12, color: Colors.black45),
+                        children: [
+                          TextSpan(
+                            text: 'By creating an account, you agree to our ',
+                          ),
+                          TextSpan(
+                            text: 'Terms of Service',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          TextSpan(text: ' and '),
+                          TextSpan(
+                            text: 'Privacy Policy',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  textAlign: TextAlign.center,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),

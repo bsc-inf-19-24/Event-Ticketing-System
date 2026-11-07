@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../features/auth/logic/auth_controller.dart';
+import '../features/tickets/logic/tickets_controller.dart';
 import 'event_details_screen.dart';
 import '../data/sample_events.dart';
 import '../models/event.dart';
@@ -10,15 +12,9 @@ const double _homeControlsHeaderHeight = 160;
 
 class HomeScreen extends StatefulWidget {
   final String? customerName;
-  final int ticketCount;
   final VoidCallback onViewTickets;
 
-  const HomeScreen({
-    super.key,
-    this.customerName,
-    this.ticketCount = 0,
-    required this.onViewTickets,
-  });
+  const HomeScreen({super.key, this.customerName, required this.onViewTickets});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -27,15 +23,25 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final List<String> categories = ['For you', 'Sports', 'Concerts', 'Workshop'];
   String selectedCategory = 'For you';
+  String searchQuery = '';
 
   // Events to show, based on the selected chip
   List<Event> get filteredEvents {
-    if (selectedCategory == 'For you') {
-      return sampleEvents;
-    }
-    return sampleEvents
-        .where((event) => event.category == selectedCategory)
-        .toList();
+    final query = searchQuery.trim().toLowerCase();
+    return sampleEvents.where((event) {
+      final matchesCategory =
+          selectedCategory == 'For you' || event.category == selectedCategory;
+      final matchesQuery =
+          query.isEmpty ||
+          [
+            event.title,
+            event.category,
+            event.genre,
+            event.venue,
+            event.date,
+          ].any((value) => value.toLowerCase().contains(query));
+      return matchesCategory && matchesQuery;
+    }).toList();
   }
 
   @override
@@ -62,8 +68,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
                   _buildWelcome(),
-                  const SizedBox(height: 12),
-                  _buildTicketsBanner(),
+                  if (authController.isLoggedIn) ...[
+                    const SizedBox(height: 12),
+                    _buildTicketsBanner(),
+                  ],
                   const SizedBox(height: 16),
                 ],
               ),
@@ -76,12 +84,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             if (events.isEmpty)
-              const SliverFillRemaining(
+              SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(
                   child: Text(
-                    'No events in this category yet',
-                    style: TextStyle(color: Colors.white70),
+                    searchQuery.trim().isNotEmpty
+                        ? 'No events found'
+                        : 'No events in this category yet',
+                    style: const TextStyle(color: Colors.white70),
                   ),
                 ),
               )
@@ -101,6 +111,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
+                            settings: const RouteSettings(
+                              name: EventDetailsScreen.routeName,
+                            ),
                             builder: (context) =>
                                 EventDetailsScreen(event: event),
                           ),
@@ -118,13 +131,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Builds the welcome message
   Widget _buildWelcome() {
-    final name = widget.customerName;
+    final name = authController.user?.name ?? widget.customerName;
+    final hasName =
+        authController.isLoggedIn && name != null && name.isNotEmpty;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Align(
         alignment: Alignment.centerLeft,
         child: Text(
-          (name == null || name.isEmpty) ? 'Welcome!' : 'Welcome back, $name!',
+          hasName ? 'Welcome back, $name!' : 'Welcome!',
           style: const TextStyle(color: Colors.white, fontSize: 18),
         ),
       ),
@@ -132,42 +147,46 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildTicketsBanner() {
-    final count = widget.ticketCount;
-    final hasTickets = count > 0;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: InkWell(
-        onTap: hasTickets ? widget.onViewTickets : null,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white10,
+    return ListenableBuilder(
+      listenable: ticketsController,
+      builder: (context, _) {
+        final count = ticketsController.count;
+        final hasTickets = count > 0;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: InkWell(
+            onTap: hasTickets ? widget.onViewTickets : null,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.accent),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.confirmation_number_outlined,
-                color: AppColors.accent,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white10,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.accent),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  hasTickets
-                      ? 'You have $count ${count == 1 ? 'ticket' : 'tickets'}'
-                      : "You don't have any tickets yet. Pick an event below to get started.",
-                  style: const TextStyle(color: Colors.white),
-                ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.confirmation_number_outlined,
+                    color: AppColors.accent,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      hasTickets
+                          ? 'You have $count ${count == 1 ? 'ticket' : 'tickets'}'
+                          : "You don't have any tickets yet. Pick an event below to get started.",
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                  if (hasTickets)
+                    const Icon(Icons.chevron_right, color: Colors.white),
+                ],
               ),
-              if (hasTickets)
-                const Icon(Icons.chevron_right, color: Colors.white),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -176,6 +195,11 @@ class _HomeScreenState extends State<HomeScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: TextField(
+        onChanged: (value) {
+          setState(() {
+            searchQuery = value;
+          });
+        },
         decoration: InputDecoration(
           hintText: 'Search',
           prefixIcon: const Icon(Icons.search),

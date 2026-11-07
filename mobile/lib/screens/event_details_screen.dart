@@ -4,8 +4,10 @@ import '../models/event.dart';
 import '../theme/app_colors.dart';
 import '../utils/format.dart';
 import '../utils/auth_guard.dart';
+import 'ticket_selection_screen.dart';
 
 class EventDetailsScreen extends StatelessWidget {
+  static const routeName = '/event-details';
   final Event event;
 
   const EventDetailsScreen({super.key, required this.event});
@@ -54,6 +56,13 @@ class EventDetailsScreen extends StatelessWidget {
                       ? () async {
                           final allowed = await requireLogin(context);
                           if (!allowed || !context.mounted) return;
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  TicketSelectionScreen(event: event),
+                            ),
+                          );
                         }
                       : null,
                   child: Text(canBuy ? 'Buy Ticket' : 'Not available'),
@@ -125,7 +134,7 @@ class EventDetailsScreen extends StatelessWidget {
         children: [
           for (final ticket in event.ticketTypes) ...[
             Text(ticket.name, style: _bodyStyle),
-            Text('MWK ${formatPrice(ticket.price)}', style: _bodyStyle),
+            Text('Price: MWK ${formatPrice(ticket.price)}', style: _bodyStyle),
             const SizedBox(height: 8),
           ],
           const SizedBox(height: 8),

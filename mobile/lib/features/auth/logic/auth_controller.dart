@@ -22,6 +22,12 @@ class AuthController extends ChangeNotifier {
   /// Whether an authentication operation is in progress.
   bool get isBusy => _isBusy;
 
+  /// Stores a user authenticated by another application layer.
+  void setAuthenticatedUser(AppUser user) {
+    _user = user;
+    notifyListeners();
+  }
+
   /// Creates an account and signs the new user in.
   Future<void> signUp(String name, String email, String password) async {
     _isBusy = true;
@@ -61,5 +67,6 @@ class AuthController extends ChangeNotifier {
   }
 }
 
-// Swap FakeAuthService for the real service here later.
-final authController = AuthController(FakeAuthService());
+// Share the demo accounts between the app login flow and auth state.
+final fakeAuthService = FakeAuthService();
+final authController = AuthController(fakeAuthService);
