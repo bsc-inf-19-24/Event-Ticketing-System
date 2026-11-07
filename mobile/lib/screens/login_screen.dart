@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:mobile/features/auth/data/presentation/provider/auth_provider.dart';
 
 import 'auth_common.dart';
+import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -54,9 +55,17 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _onForgotPassword() {
-    // TODO: navigate to your forgot-password flow.
-    Fluttertoast.showToast(msg: 'Forgot password is not connected yet.');
+  Future<void> _onForgotPassword() async {
+    final reset = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+    );
+    if (reset == true && mounted) {
+      Fluttertoast.showToast(
+        msg: 'Password reset successful. Log in with your new password.',
+        backgroundColor: Colors.green,
+        textColor: Colors.white,
+      );
+    }
   }
 
   void _onGooglePressed() {
@@ -64,9 +73,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _goToSignup() async {
-    final ok = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const SignupScreen()),
-    );
+    final ok = await Navigator.of(context)
+        .push<bool>(MaterialPageRoute(builder: (_) => const SignupScreen()));
     if (ok == true && mounted) Navigator.of(context).pop(true);
   }
 
@@ -103,12 +111,22 @@ class _LoginScreenState extends State<LoginScreen> {
                               border: Border.all(color: Colors.red.shade200),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Text(
-                              authProvider.errorMessage!,
-                              style: TextStyle(
-                                color: Colors.red.shade800,
-                                fontSize: 13,
-                              ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  authProvider.errorMessage!,
+                                  style: TextStyle(
+                                    color: Colors.red.shade800,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                TextButton.icon(
+                                  onPressed: _onLoginPressed,
+                                  icon: const Icon(Icons.refresh),
+                                  label: const Text('Retry'),
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -145,7 +163,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: Colors.black54,
                               ),
                               onPressed: () => setState(
-                                  () => _obscurePassword = !_obscurePassword),
+                                () => _obscurePassword = !_obscurePassword,
+                              ),
                             ),
                           ),
                           validator: (v) => (v == null || v.isEmpty)
@@ -159,8 +178,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             onPressed: _onForgotPassword,
                             style: TextButton.styleFrom(
                               foregroundColor: Colors.black87,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
                             ),
                             child: const Text(
                               'Forgot password?',
