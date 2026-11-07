@@ -5,6 +5,8 @@ import '../features/tickets/logic/tickets_controller.dart';
 import '../models/ticket.dart';
 import '../theme/app_colors.dart';
 import '../widgets/login_required_view.dart';
+import '../widgets/offline_banner.dart';
+import '../widgets/retry_error_view.dart';
 import 'main_shell.dart';
 import 'ticket_details_screen.dart';
 
@@ -18,7 +20,6 @@ class TicketsScreen extends StatefulWidget {
 
 class _TicketsScreenState extends State<TicketsScreen> {
   bool _loading = true;
-  String? _error;
 
   @override
   void initState() {
@@ -40,12 +41,11 @@ class _TicketsScreenState extends State<TicketsScreen> {
   Future<void> _load() async {
     setState(() {
       _loading = true;
-      _error = null;
     });
     try {
       await ticketsController.load();
     } catch (_) {
-      if (mounted) setState(() => _error = 'Could not load tickets.');
+      // TicketsController exposes the failure while keeping any cached tickets.
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -58,7 +58,9 @@ class _TicketsScreenState extends State<TicketsScreen> {
         builder: (_) => TicketDetailsScreen(
           ticket: ticket,
           isSaved: true,
+          isOffline: ticketsController.isOffline,
           onDownload: (_) async => true,
+          onRefresh: ticketsController.loadTicketDetails,
         ),
       ),
     );
@@ -102,19 +104,11 @@ class _TicketsScreenState extends State<TicketsScreen> {
     if (_loading || ticketsController.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(_error!, style: const TextStyle(color: Colors.white)),
-            const SizedBox(height: 8),
-            ElevatedButton(onPressed: _load, child: const Text('Retry')),
-          ],
-        ),
-      );
-    }
     if (tickets.isEmpty) {
+      final errorMessage = ticketsController.errorMessage;
+      if (errorMessage != null) {
+        return RetryErrorView(message: errorMessage, onRetry: _load);
+      }
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -155,9 +149,13 @@ class _TicketsScreenState extends State<TicketsScreen> {
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
-        itemCount: tickets.length,
+        itemCount: tickets.length + (ticketsController.isOffline ? 1 : 0),
         itemBuilder: (context, index) {
-          final ticket = tickets[index];
+          if (ticketsController.isOffline && index == 0) {
+            return const OfflineBanner();
+          }
+          final ticketIndex = index - (ticketsController.isOffline ? 1 : 0);
+          final ticket = tickets[ticketIndex];
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: _TicketCard(
@@ -208,17 +206,18 @@ class _TicketCard extends StatelessWidget {
                               size: 36,
                             ),
                           )
+                        : ticket.imagePath.startsWith('http')
+                        ? Image.network(
+                            ticket.imagePath,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) =>
+                                const _TicketImageError(),
+                          )
                         : Image.asset(
                             ticket.imagePath,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => const ColoredBox(
-                              color: AppColors.card,
-                              child: Icon(
-                                Icons.broken_image_outlined,
-                                color: Colors.white70,
-                                size: 36,
-                              ),
-                            ),
+                            errorBuilder: (_, _, _) =>
+                                const _TicketImageError(),
                           ),
                   ),
                   Expanded(
@@ -297,5 +296,15 @@ class _TicketText extends StatelessWidget {
     maxLines: 1,
     overflow: TextOverflow.ellipsis,
     style: style ?? const TextStyle(color: AppColors.textDark),
+  );
+}
+
+class _TicketImageError extends StatelessWidget {
+  const _TicketImageError();
+
+  @override
+  Widget build(BuildContext context) => const ColoredBox(
+    color: AppColors.card,
+    child: Icon(Icons.broken_image_outlined, color: Colors.white70, size: 36),
   );
 }

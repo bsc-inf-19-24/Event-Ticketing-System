@@ -1,4 +1,5 @@
-import '../data/sample_tickets.dart';
+import '../core/network/api_client.dart';
+import '../features/tickets/data/ticket_api.dart';
 import '../models/ticket.dart';
 import 'ticket_storage.dart';
 
@@ -17,46 +18,85 @@ class TicketListResult {
 }
 
 class TicketRepository {
-  TicketRepository({TicketStorage? storage})
-      : _storage = storage ?? TicketStorage();
+  TicketRepository({TicketStorage? storage, TicketApi? api})
+    : _storage = storage ?? TicketStorage(),
+      _api = api ?? _configuredApi();
 
   final TicketStorage _storage;
+  final TicketApi? _api;
 
-  /// Swap this for the real API call later. Throw on failure.
-  Future<List<Ticket>> fetchRemoteTickets() async => sampleTickets;
+  static TicketApi? _configuredApi() {
+    const baseUrl = String.fromEnvironment('API_BASE_URL');
+    if (baseUrl.isEmpty) return null;
+    return TicketApi(apiClient: ApiClient(baseUrl: baseUrl));
+  }
 
-  Future<TicketListResult> load({required bool hasConnection}) async {
-    if (hasConnection) {
+  Future<TicketListResult> load({
+    required String userId,
+    required bool hasConnection,
+  }) async {
+    if (userId.isEmpty) throw ArgumentError.value(userId, 'userId');
+
+    final api = _api;
+    if (hasConnection && api != null) {
       try {
-        final remote = await fetchRemoteTickets();
-        await _storage.refreshSavedTickets(remote); // refresh local copies
-        final saved = await _storage.getSavedTickets();
-        final savedIds = saved.map((t) => t.id).toSet();
-
-        // Remote is the source of truth; keep saved tickets that the
-        // server no longer lists so they don't silently vanish.
-        final byId = {for (final t in remote) t.id: t};
-        for (final t in saved) {
-          byId.putIfAbsent(t.id, () => t);
-        }
-
+        final remote = await api.getMyTickets(userId);
+        await _storage.synchronizeUserTickets(userId, remote);
         return TicketListResult(
-          tickets: byId.values.toList(),
-          savedIds: savedIds,
+          tickets: remote.reversed.toList(),
+          savedIds: remote.map((ticket) => ticket.id).toSet(),
           isOffline: false,
-          lastSynced: await _storage.getLastSynced(),
+          lastSynced: DateTime.now(),
         );
-      } catch (_) {
-        // Backend unreachable: fall through to offline mode.
+      } on ApiException catch (error) {
+        if (error.statusCode == 401 || error.statusCode == 403) rethrow;
+        final cached = await _storage.getSavedTickets(userId: userId);
+        if (cached.isEmpty) rethrow;
+        return TicketListResult(
+          tickets: cached.reversed.toList(),
+          savedIds: cached.map((ticket) => ticket.id).toSet(),
+          isOffline: true,
+          lastSynced: await _storage.getLastSynced(userId: userId),
+        );
       }
     }
 
-    final saved = await _storage.getSavedTickets();
+    final cached = await _storage.getSavedTickets(userId: userId);
     return TicketListResult(
-      tickets: saved,
-      savedIds: saved.map((t) => t.id).toSet(),
-      isOffline: true,
-      lastSynced: await _storage.getLastSynced(),
+      tickets: cached.reversed.toList(),
+      savedIds: cached.map((ticket) => ticket.id).toSet(),
+      isOffline: api != null && !hasConnection,
+      lastSynced: await _storage.getLastSynced(userId: userId),
     );
   }
+
+  Future<Ticket> getTicketDetails({
+    required String ticketId,
+    required String userId,
+    required bool hasConnection,
+  }) async {
+    if (ticketId.isEmpty || userId.isEmpty) {
+      throw ArgumentError('Ticket ID and authenticated user ID are required.');
+    }
+
+    final api = _api;
+    if (hasConnection && api != null) {
+      final ticket = await api.getTicketDetails(
+        ticketId,
+        authenticatedUserId: userId,
+      );
+      await _storage.saveTickets([ticket]);
+      return ticket;
+    }
+
+    final saved = await _storage.getSavedTickets(userId: userId);
+    return saved.firstWhere(
+      (ticket) => ticket.id == ticketId,
+      orElse: () =>
+          throw ApiException('This ticket is not saved on this device.'),
+    );
+  }
+
+  Future<void> saveTickets(List<Ticket> tickets) =>
+      _storage.saveTickets(tickets);
 }

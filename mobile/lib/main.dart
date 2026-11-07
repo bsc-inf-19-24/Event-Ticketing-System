@@ -5,6 +5,7 @@ import 'package:mobile/screens/main_shell.dart';
 // Core imports
 import 'core/network/api_client.dart';
 import 'core/storage/secure_storage.dart';
+import 'features/tickets/logic/connectivity_monitor.dart';
 
 // Authentication feature imports
 import 'features/auth/data/datasources/auth_remote_datasource.dart';
@@ -16,12 +17,16 @@ import 'features/auth/logic/auth_controller.dart';
 
 const apiBaseUrl = String.fromEnvironment('API_BASE_URL');
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await connectivityMonitor.start();
   final secureStorage = SecureStorageService();
   final remoteDataSource = apiBaseUrl.isEmpty
       ? MockAuthRemoteDataSource(authService: fakeAuthService)
       : AuthRemoteDataSourceImpl(
-          apiClient: ApiClient(baseUrl: apiBaseUrl.replaceFirst(RegExp(r'/+$'), '')),
+          apiClient: ApiClient(
+            baseUrl: apiBaseUrl.replaceFirst(RegExp(r'/+$'), ''),
+          ),
         );
 
   final authRepository = AuthRepositoryImpl(
