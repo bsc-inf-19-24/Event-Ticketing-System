@@ -16,6 +16,7 @@ import 'features/auth/data/datasources/mock_auth_remote_datasource.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/domain/usecases/login_usecase.dart';
 import 'features/auth/domain/usecases/password_reset_usecase.dart';
+import 'features/auth/domain/repositories/auth_repository.dart';
 import 'features/auth/data/presentation/provider/auth_provider.dart';
 import 'features/auth/logic/auth_controller.dart';
 import 'features/auth/domain/repositories/auth_repository.dart';
@@ -74,6 +75,7 @@ Future<void> main() async {
       registerUseCase: registerUseCase,
       authRepository: authRepository,
       passwordResetUseCase: passwordResetUseCase,
+      authRepository: authRepository,
       restoreSessionOnLaunch: !ApiConfig.useFakeAuth,
     ),
   );
@@ -84,12 +86,14 @@ class MyApp extends StatelessWidget {
   final RegisterUseCase? registerUseCase;
   final AuthRepository? authRepository;
   final PasswordResetUseCase passwordResetUseCase;
+  final AuthRepository? authRepository;
   final bool restoreSessionOnLaunch;
 
   const MyApp({
     super.key,
     required this.loginUseCase,
     required this.passwordResetUseCase,
+    this.authRepository,
     this.registerUseCase,
     this.authRepository,
     this.restoreSessionOnLaunch = false,
@@ -101,6 +105,11 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
+          create: (_) => AuthProvider(
+            loginUseCase: loginUseCase,
+            passwordResetUseCase: passwordResetUseCase,
+            authRepository: authRepository,
+          ),
           create: (_) {
             final authProvider = AuthProvider(
               loginUseCase: loginUseCase,

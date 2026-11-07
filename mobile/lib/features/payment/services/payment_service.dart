@@ -1,6 +1,6 @@
 import '../models/payment_models.dart';
 
-/// Defines the API surface used by a real or simulated payment service.
+/// Defines the API surface used by a backend-backed or simulated payment service.
 abstract class PaymentService {
   Future<List<MobileMoneyOperator>> getMobileMoneyOperators();
   Future<CheckoutSession> initiateCheckout(PaymentRequest request);
@@ -12,7 +12,7 @@ abstract class PaymentService {
   });
   Future<PaymentVerification> verifyPayment(String txRef);
 
-  /// Completes a simulated transaction; production systems must verify on a backend.
+  /// Simulators use this hook; real payments must be verified by the backend.
   void completePayment(String txRef, PaymentOutcome outcome);
 }
 

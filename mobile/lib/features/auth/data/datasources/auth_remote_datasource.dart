@@ -61,6 +61,19 @@ class ApiAuthService implements AuthRemoteDataSource {
 
   @override
   Future<UserModel> loginWithGoogle(String idToken) async {
+    if (idToken.trim().isEmpty) {
+      throw ApiException('Google did not return an ID token.');
+    }
+    final responseData = await apiClient.post('/auth/google', {
+      'idToken': idToken,
+    });
+    return UserModel.fromJson(responseData);
+  }
+
+  @override
+  Future<PasswordResetRequest> requestPasswordReset(String email) async {
+    final responseData = await apiClient.post('/auth/forgot-password', {
+      'email': email.trim(),
     final response = await apiClient.postUnauthenticated('/api/auth/google', {
       'idToken': idToken,
     });

@@ -60,6 +60,16 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<UserModel> loginWithGoogle(String idToken) async {
+    final userModel = await remoteDataSource.loginWithGoogle(idToken);
+    if (userModel.token.isEmpty) {
+      throw Exception('The server did not return an authentication token.');
+    }
+    await secureStorage.saveToken(userModel.token);
+    return userModel;
+  }
+
+  @override
   Future<UserModel?> restoreSession() async {
     final token = await secureStorage.getToken();
     if (token == null || token.isEmpty) return null;

@@ -8,16 +8,25 @@ import 'package:mobile/features/auth/domain/entities/user.dart';
 import 'package:mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:mobile/features/auth/logic/auth_controller.dart';
 import 'package:mobile/features/auth/models/app_user.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:mobile/features/auth/domain/repositories/auth_repository.dart';
+
+const _googleClientId = String.fromEnvironment('GOOGLE_CLIENT_ID');
+const _googleServerClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
+Future<void>? _googleSignInInitialization;
 
 class AuthProvider extends ChangeNotifier {
   final LoginUseCase loginUseCase;
   final RegisterUseCase registerUseCase;
   final PasswordResetUseCase passwordResetUseCase;
+  final AuthRepository? authRepository;
   final AuthRepository authRepository;
 
   AuthProvider({
     required this.loginUseCase,
     required this.passwordResetUseCase,
+    this.authRepository,
+  });
     RegisterUseCase? registerUseCase,
     AuthRepository? authRepository,
   }) : registerUseCase =
@@ -96,6 +105,13 @@ class AuthProvider extends ChangeNotifier {
     try {
       final user = await loginUseCase.execute(email, password);
 
+      authController.setAuthenticatedUser(
+        AppUser(
+          id: user.id,
+          name: user.name.isEmpty ? user.email.split('@').first : user.name,
+          email: user.email,
+        ),
+      );
       _setAuthenticatedUser(user);
 
       _isLoading = false;
@@ -111,6 +127,37 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> loginWithGoogle() async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      if (authRepository == null) {
+        throw Exception('Google sign-in is unavailable in this configuration.');
+      }
+      final google = GoogleSignIn.instance;
+      _googleSignInInitialization ??= google.initialize(
+        clientId: _googleClientId.isEmpty ? null : _googleClientId,
+        serverClientId: _googleServerClientId.isEmpty
+            ? null
+            : _googleServerClientId,
+      );
+      await _googleSignInInitialization;
+      final account = await google.authenticate();
+      final idToken = account.authentication.idToken;
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception('Google did not return an ID token. Check your OAuth client configuration.');
+      }
+      final user = await authRepository!.loginWithGoogle(idToken);
+      authController.setAuthenticatedUser(AppUser(
+        id: user.id,
+        name: user.name.isEmpty ? user.email.split('@').first : user.name,
+        email: user.email,
+      ));
+      _isSuccess = true;
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
   Future<bool> loginWithGoogle(String idToken) async {
     _isLoading = true;
     _errorMessage = null;

@@ -34,6 +34,7 @@ class PaymentController extends ChangeNotifier {
   final AuthController _auth;
   final Random _random;
   Order? order;
+  CheckoutSession? checkoutSession;
   bool isProcessing = false;
   String? failureReason;
   List<Ticket> purchasedTickets = const [];
@@ -59,6 +60,7 @@ class PaymentController extends ChangeNotifier {
     }
     isProcessing = true;
     failureReason = null;
+    checkoutSession = null;
     _buyerName = user.name;
     _buyerEmail = user.email;
     notifyListeners();
@@ -81,26 +83,22 @@ class PaymentController extends ChangeNotifier {
     try {
       await _orderRepository.saveOrder(createdOrder);
       order = createdOrder;
-      if (method == PaymentMethod.card) {
-        final names = user.name.trim().split(RegExp(r'\s+'));
-        await _paymentService.initiateCheckout(
-          PaymentRequest(
-            amount: total,
-            email: user.email,
-            firstName: names.first,
-            lastName: names.length > 1 ? names.skip(1).join(' ') : '',
-            txRef: txRef,
-            meta: {'order_id': createdOrder.id},
-          ),
-        );
-      } else {
-        await _paymentService.chargeMobileMoney(
-          operatorRefId: method == PaymentMethod.airtelMoney
-              ? 'airtel-money'
-              : 'tnm-mpamba',
-          mobile: phone,
+      final names = user.name.trim().split(RegExp(r'\s+'));
+      checkoutSession = await _paymentService.initiateCheckout(
+        PaymentRequest(
           amount: total,
-          chargeId: txRef,
+          email: user.email,
+          firstName: names.first,
+          lastName: names.length > 1 ? names.skip(1).join(' ') : '',
+          txRef: txRef,
+          mobile: method == PaymentMethod.card ? null : phone,
+          meta: {'order_id': createdOrder.id},
+        ),
+      );
+      if (checkoutSession!.checkoutUrl.isEmpty ||
+          checkoutSession!.txRef != txRef) {
+        throw const PaymentException(
+          'PayChangu returned an invalid checkout session.',
         );
       }
     } catch (error) {

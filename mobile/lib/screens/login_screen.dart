@@ -68,8 +68,19 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _onGooglePressed() {
-    Fluttertoast.showToast(msg: 'Google sign-in is not connected yet.');
+  Future<void> _onGooglePressed() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final success = await authProvider.loginWithGoogle();
+    if (!mounted) return;
+    if (success) {
+      Navigator.of(context).pop(true);
+    } else {
+      Fluttertoast.showToast(
+        msg: authProvider.errorMessage ?? 'Google sign-in failed.',
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+    }
   }
 
   Future<void> _goToSignup() async {
@@ -199,7 +210,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 20),
                         const OrDivider(),
                         const SizedBox(height: 20),
-                        GoogleButton(onPressed: _onGooglePressed),
+                        GoogleButton(
+                          onPressed: authProvider.isLoading
+                              ? () {}
+                              : _onGooglePressed,
+                        ),
                         const SizedBox(height: 24),
 
                         SwitchAuthRow(

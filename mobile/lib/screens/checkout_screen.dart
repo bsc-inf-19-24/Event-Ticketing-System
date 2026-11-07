@@ -5,6 +5,7 @@ import '../features/orders/models/order.dart';
 import '../features/payment/logic/payment_controller.dart';
 import '../features/payment/models/payment_models.dart';
 import '../features/payment/services/payment_service.dart';
+import '../features/payment/services/fake_payment_service.dart';
 import '../models/event.dart';
 import '../theme/app_colors.dart';
 import '../utils/format.dart';
@@ -202,7 +203,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 child: Column(
                   children: [
                     const Text(
-                      'TEST MODE - no real money is charged',
+                      useFakePayments
+                          ? 'TEST MODE - no real money is charged'
+                          : 'Payment is securely processed by PayChangu',
                       style: TextStyle(
                         color: Colors.orangeAccent,
                         fontSize: 12,
@@ -292,15 +295,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final cancelPrompt = _cancelPrompt;
       if (cancelPrompt != null) await cancelPrompt;
       if (!mounted || _cancelRequested) return;
-      final page = _method == PaymentMethod.card
-          ? FakeHostedCheckoutScreen(
+      final page = useFakePayments
+          ? (_method == PaymentMethod.card
+                ? FakeHostedCheckoutScreen(
+                    event: widget.event,
+                    controller: _paymentController,
+                  )
+                : MobileMoneyApprovalScreen(
+                    event: widget.event,
+                    controller: _paymentController,
+                    phone: phone,
+                  ))
+          : PayChanguCheckoutScreen(
               event: widget.event,
               controller: _paymentController,
-            )
-          : MobileMoneyApprovalScreen(
-              event: widget.event,
-              controller: _paymentController,
-              phone: phone,
             );
       Navigator.push(context, MaterialPageRoute(builder: (_) => page));
     } catch (error) {
