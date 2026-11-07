@@ -1,11 +1,9 @@
 import '../../../../core/network/api_client.dart';
-
-import 'package:mobile/features/auth/data/model/user_model.dart';
-import 'package:mobile/features/auth/services/fake_auth_service.dart';
-import 'package:mobile/features/auth/services/auth_service.dart';
-
-import 'auth_remote_datasource.dart';
 import '../../domain/entities/password_reset_request.dart';
+import '../model/user_model.dart';
+import '../../services/auth_service.dart';
+import '../../services/fake_auth_service.dart';
+import 'auth_remote_datasource.dart';
 
 class MockAuthRemoteDataSource implements AuthRemoteDataSource {
   MockAuthRemoteDataSource({FakeAuthService? authService})
@@ -53,16 +51,15 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
       );
       return _currentUser!;
     } on AuthException {
-      throw ApiException('Invalid email or password. Please try again.', 401);
+      throw const ApiException(
+        'Invalid email or password. Please try again.',
+        401,
+      );
     }
   }
 
   @override
   Future<UserModel> loginWithGoogle(String idToken) async {
-    throw ApiException(
-      'Google sign-in requires a configured backend. Set API_BASE_URL and configure POST /auth/google.',
-      501,
-  Future<UserModel> loginWithGoogle(String idToken) {
     throw const ApiException('Google sign-in is unavailable in demo mode.');
   }
 
@@ -70,7 +67,7 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
   Future<UserModel> getCurrentProfile() async {
     final user = _currentUser;
     if (user == null) {
-      throw ApiException('No signed-in demo user is available.', 401);
+      throw const ApiException('No signed-in demo user is available.', 401);
     }
     return user;
   }

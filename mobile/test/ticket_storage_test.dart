@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as path;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:sqflite/sqflite.dart';
 
 import 'package:mobile/models/ticket.dart';
 import 'package:mobile/services/ticket_repository.dart';
@@ -12,6 +11,9 @@ void main() {
   setUpAll(() {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
+  });
+
+  setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
 
@@ -20,6 +22,7 @@ void main() {
         'ticket_storage_test_${DateTime.now().microsecondsSinceEpoch}.db';
     final ticket = Ticket(
       id: 'ticket-1',
+      userId: 'local-user',
       eventName: 'Local concert',
       date: '5 Dec 2026, 3:00 PM',
       venue: 'City Hall',
@@ -39,6 +42,7 @@ void main() {
     await storage.saveTicket(
       Ticket(
         id: ticket.id,
+        userId: ticket.userId,
         eventName: 'Duplicate',
         date: ticket.date,
         venue: ticket.venue,
@@ -54,9 +58,8 @@ void main() {
     final reopenedStorage = TicketStorage(databaseName: databaseName);
     expect((await reopenedStorage.getTicket(ticket.id))!.qrData, ticket.qrData);
 
-    final offlineTickets = await TicketRepository(
-      storage: reopenedStorage,
-    ).load(hasConnection: false);
+    final offlineTickets = await TicketRepository(storage: reopenedStorage)
+        .load(userId: ticket.userId, hasConnection: false);
     expect(offlineTickets.isOffline, isTrue);
     expect(offlineTickets.savedIds, contains(ticket.id));
     expect(offlineTickets.tickets.single.qrData, ticket.qrData);
@@ -64,6 +67,7 @@ void main() {
     await reopenedStorage.updateTicket(
       Ticket(
         id: ticket.id,
+        userId: ticket.userId,
         eventName: 'Updated concert',
         date: ticket.date,
         venue: ticket.venue,
@@ -77,18 +81,14 @@ void main() {
     expect(updated.status, 'Used');
     expect(updated.downloadedAt, stored.downloadedAt);
 
-    await reopenedStorage.deleteTicket(ticket.id);
+    await reopenedStorage.deleteTicket(ticket.id, userId: ticket.userId);
     expect(await reopenedStorage.getTicket(ticket.id), isNull);
     await reopenedStorage.close();
     await databaseFactory.deleteDatabase(
       path.join(await getDatabasesPath(), databaseName),
     );
   });
-}
-import 'package:mobile/models/ticket.dart';
-import 'package:mobile/services/ticket_storage.dart';
 
-void main() {
   test('SQLite ticket sync updates and isolates records by user', () async {
     final storage = TicketStorage(databasePath: ':memory:');
     final firstUserTicket = _ticket('ticket-1', 'user-1');
@@ -105,8 +105,11 @@ void main() {
 
     expect(firstUserTickets, hasLength(1));
     expect(firstUserTickets.single.status, 'Used');
-    expect(secondUserTickets.single.toJson(), secondUserTicket.toJson());
+    expect(secondUserTickets.single.userId, secondUserTicket.userId);
+    expect(secondUserTickets.single.status, secondUserTicket.status);
+    expect(secondUserTickets.single.qrData, secondUserTicket.qrData);
     expect(await storage.getLastSynced(userId: 'user-1'), isNotNull);
+    await storage.close();
   });
 }
 

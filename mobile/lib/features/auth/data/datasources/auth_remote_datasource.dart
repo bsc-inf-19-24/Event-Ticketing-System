@@ -1,7 +1,6 @@
 import '../../../../core/network/api_client.dart';
 import '../../domain/entities/password_reset_request.dart';
-
-import 'package:mobile/features/auth/data/model/user_model.dart';
+import '../model/user_model.dart';
 
 abstract class AuthRemoteDataSource {
   Future<UserModel> register({
@@ -23,9 +22,9 @@ abstract class AuthRemoteDataSource {
 }
 
 class ApiAuthService implements AuthRemoteDataSource {
-  final ApiClient apiClient;
-
   ApiAuthService({required this.apiClient});
+
+  final ApiClient apiClient;
 
   Map<String, dynamic> _responseMap(dynamic response) {
     if (response is Map<String, dynamic>) return response;
@@ -51,41 +50,28 @@ class ApiAuthService implements AuthRemoteDataSource {
 
   @override
   Future<UserModel> login(String email, String password) async {
-    final responseData = await apiClient.postUnauthenticated(
-      '/api/auth/login',
-      {'email': email.trim(), 'password': password},
-    );
-
-    return UserModel.fromJson(_responseMap(responseData));
+    final response = await apiClient.postUnauthenticated('/api/auth/login', {
+      'email': email.trim(),
+      'password': password,
+    });
+    return UserModel.fromJson(_responseMap(response));
   }
 
   @override
   Future<UserModel> loginWithGoogle(String idToken) async {
     if (idToken.trim().isEmpty) {
-      throw ApiException('Google did not return an ID token.');
+      throw const ApiException('Google did not return an ID token.');
     }
-    final responseData = await apiClient.post('/auth/google', {
-      'idToken': idToken,
-    });
-    return UserModel.fromJson(responseData);
-  }
-
-  @override
-  Future<PasswordResetRequest> requestPasswordReset(String email) async {
-    final responseData = await apiClient.post('/auth/forgot-password', {
-      'email': email.trim(),
     final response = await apiClient.postUnauthenticated('/api/auth/google', {
       'idToken': idToken,
     });
     return UserModel.fromJson(_responseMap(response));
   }
 
-  Future<List<int>> generateQrImage(String text) {
-    return apiClient.getBytes(
-      '/api/auth/qr/${Uri.encodeComponent(text)}',
-      authenticated: false,
-    );
-  }
+  Future<List<int>> generateQrImage(String text) => apiClient.getBytes(
+    '/api/auth/qr/${Uri.encodeComponent(text)}',
+    authenticated: false,
+  );
 
   @override
   Future<UserModel> getCurrentProfile() async {
@@ -107,12 +93,11 @@ class ApiAuthService implements AuthRemoteDataSource {
 
   @override
   Future<PasswordResetRequest> requestPasswordReset(String email) async {
-    final responseData = await apiClient.postUnauthenticated(
+    final response = await apiClient.postUnauthenticated(
       '/api/auth/forgot-password',
       {'email': email.trim()},
     );
-    final body = _responseMap(responseData);
-
+    final body = _responseMap(response);
     return PasswordResetRequest(
       message: body['message'] is String
           ? body['message'] as String

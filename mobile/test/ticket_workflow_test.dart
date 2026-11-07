@@ -8,8 +8,12 @@ import 'package:mobile/features/tickets/data/ticket_api.dart';
 import 'package:mobile/models/ticket.dart';
 import 'package:mobile/services/ticket_repository.dart';
 import 'package:mobile/services/ticket_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  SharedPreferences.setMockInitialValues({});
+
   test('retrieves, synchronizes, opens, then reads tickets offline', () async {
     final client = MockClient((request) async {
       expect(request.headers['Authorization'], 'Bearer integration-token');
