@@ -12,6 +12,7 @@ import 'features/auth/data/datasources/mock_auth_remote_datasource.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/domain/usecases/login_usecase.dart';
 import 'features/auth/domain/usecases/password_reset_usecase.dart';
+import 'features/auth/domain/repositories/auth_repository.dart';
 import 'features/auth/data/presentation/provider/auth_provider.dart';
 import 'features/auth/logic/auth_controller.dart';
 
@@ -38,6 +39,7 @@ void main() {
     MyApp(
       loginUseCase: loginUseCase,
       passwordResetUseCase: passwordResetUseCase,
+      authRepository: authRepository,
     ),
   );
 }
@@ -45,11 +47,13 @@ void main() {
 class MyApp extends StatelessWidget {
   final LoginUseCase loginUseCase;
   final PasswordResetUseCase passwordResetUseCase;
+  final AuthRepository? authRepository;
 
   const MyApp({
     super.key,
     required this.loginUseCase,
     required this.passwordResetUseCase,
+    this.authRepository,
   });
 
   @override
@@ -61,6 +65,7 @@ class MyApp extends StatelessWidget {
           create: (_) => AuthProvider(
             loginUseCase: loginUseCase,
             passwordResetUseCase: passwordResetUseCase,
+            authRepository: authRepository,
           ),
         ),
       ],

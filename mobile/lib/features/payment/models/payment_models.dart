@@ -9,6 +9,7 @@ class PaymentRequest {
     required this.firstName,
     required this.lastName,
     required this.txRef,
+    this.mobile,
     this.currency = 'MWK',
     this.callbackUrl = 'https://example.invalid/callback',
     this.returnUrl = 'https://example.invalid/return',
@@ -23,6 +24,7 @@ class PaymentRequest {
   final String firstName;
   final String lastName;
   final String txRef;
+  final String? mobile;
   final String callbackUrl;
   final String returnUrl;
   final String customizationTitle;
@@ -36,6 +38,7 @@ class PaymentRequest {
     'first_name': firstName,
     'last_name': lastName,
     'tx_ref': txRef,
+    if (mobile != null && mobile!.isNotEmpty) 'mobile': mobile,
     'callback_url': callbackUrl,
     'return_url': returnUrl,
     'customization': {

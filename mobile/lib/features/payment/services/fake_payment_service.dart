@@ -2,6 +2,7 @@ import 'dart:math';
 
 import '../models/payment_models.dart';
 import 'payment_service.dart';
+import 'paychangu_payment_service.dart';
 
 class _Transaction {
   _Transaction({
@@ -143,7 +144,12 @@ class FakePaymentService implements PaymentService {
   }
 }
 
-/// Replace this local simulator with a backend-backed service in production.
-/// The real secret key must never be placed in the app; production verification
-/// must be performed by a backend.
-final paymentService = FakePaymentService();
+const useFakePayments = bool.fromEnvironment(
+  'USE_FAKE_PAYMENTS',
+  defaultValue: true,
+);
+
+/// Set USE_FAKE_PAYMENTS=false for the backend-backed PayChangu flow.
+final PaymentService paymentService = useFakePayments
+    ? FakePaymentService()
+    : PayChanguPaymentService();

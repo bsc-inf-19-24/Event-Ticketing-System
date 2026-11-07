@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:provider/provider.dart';
+import 'package:mobile/features/auth/data/presentation/provider/auth_provider.dart';
 
 import 'auth_common.dart';
 
@@ -40,8 +42,19 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  void _onGooglePressed() {
-    Fluttertoast.showToast(msg: 'Google sign-up is not connected yet.');
+  Future<void> _onGooglePressed() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final success = await authProvider.loginWithGoogle();
+    if (!mounted) return;
+    if (success) {
+      Navigator.of(context).pop(true);
+    } else {
+      Fluttertoast.showToast(
+        msg: authProvider.errorMessage ?? 'Google sign-in failed.',
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+    }
   }
 
   Widget _eyeButton(bool obscured, VoidCallback onTap) {

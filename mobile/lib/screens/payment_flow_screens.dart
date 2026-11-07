@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../features/orders/models/order.dart';
 import '../features/payment/logic/payment_controller.dart';
 import '../features/payment/models/payment_models.dart';
+import '../features/payment/services/payment_service.dart';
 import '../features/tickets/logic/tickets_controller.dart';
 import '../models/event.dart';
 import '../theme/app_colors.dart';
@@ -109,6 +111,109 @@ class FakeHostedCheckoutScreen extends StatelessWidget {
             PaymentOutcome.cancelled,
           ),
           child: const Text('Cancel'),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Opens the secure PayChangu hosted checkout and verifies through our backend.
+class PayChanguCheckoutScreen extends StatefulWidget {
+  const PayChanguCheckoutScreen({
+    super.key,
+    required this.event,
+    required this.controller,
+  });
+
+  final Event event;
+  final PaymentController controller;
+
+  @override
+  State<PayChanguCheckoutScreen> createState() =>
+      _PayChanguCheckoutScreenState();
+}
+
+class _PayChanguCheckoutScreenState extends State<PayChanguCheckoutScreen> {
+  String? _error;
+  bool _opening = false;
+
+  Future<void> _openCheckout() async {
+    final url = widget.controller.checkoutSession?.checkoutUrl;
+    if (url == null) {
+      setState(
+        () => _error = 'The checkout link is missing. Restart checkout.',
+      );
+      return;
+    }
+    setState(() {
+      _opening = true;
+      _error = null;
+    });
+    try {
+      final opened = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened) {
+        throw const PaymentException('Could not open PayChangu checkout.');
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _opening = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => _PaymentScaffold(
+    title: 'PayChangu checkout',
+    controller: widget.controller,
+    event: widget.event,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _infoCard(
+          children: [
+            const Icon(Icons.lock_outline, color: AppColors.accent, size: 42),
+            const SizedBox(height: 12),
+            Text(
+              'Pay MWK ${formatPrice(widget.controller.order?.total ?? 0)} securely on PayChangu.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white),
+            ),
+            const SizedBox(height: 12),
+            SelectableText(
+              widget.controller.order?.txRef ?? '',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _actionButton(
+          label: _opening ? 'Opening checkout…' : 'Open PayChangu checkout',
+          onPressed: _opening ? () {} : _openCheckout,
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'After paying, return here and verify your payment. Tickets are issued only after the server confirms payment.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white70),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 10),
+          Text(_error!, style: const TextStyle(color: Colors.redAccent)),
+        ],
+        const SizedBox(height: 12),
+        _actionButton(
+          label: 'I completed payment — verify',
+          secondary: true,
+          onPressed: () => _showVerifying(
+            context,
+            widget.event,
+            widget.controller,
+            PaymentOutcome.success,
+          ),
         ),
       ],
     ),

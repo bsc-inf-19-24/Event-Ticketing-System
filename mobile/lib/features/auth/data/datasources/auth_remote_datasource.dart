@@ -6,6 +6,7 @@ import 'package:mobile/features/auth/data/model/user_model.dart';
 
 abstract class AuthRemoteDataSource {
   Future<UserModel> login(String email, String password);
+  Future<UserModel> loginWithGoogle(String idToken);
   Future<PasswordResetRequest> requestPasswordReset(String email);
   Future<void> resetPassword({
     required String email,
@@ -27,6 +28,17 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       'password': password,
     });
 
+    return UserModel.fromJson(responseData);
+  }
+
+  @override
+  Future<UserModel> loginWithGoogle(String idToken) async {
+    if (idToken.trim().isEmpty) {
+      throw ApiException('Google did not return an ID token.');
+    }
+    final responseData = await apiClient.post('/auth/google', {
+      'idToken': idToken,
+    });
     return UserModel.fromJson(responseData);
   }
 

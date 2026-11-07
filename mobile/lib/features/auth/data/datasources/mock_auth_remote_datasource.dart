@@ -29,6 +29,14 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
   }
 
   @override
+  Future<UserModel> loginWithGoogle(String idToken) async {
+    throw ApiException(
+      'Google sign-in requires a configured backend. Set API_BASE_URL and configure POST /auth/google.',
+      501,
+    );
+  }
+
+  @override
   Future<PasswordResetRequest> requestPasswordReset(String email) async {
     try {
       final code = await _authService.requestPasswordReset(email: email);
