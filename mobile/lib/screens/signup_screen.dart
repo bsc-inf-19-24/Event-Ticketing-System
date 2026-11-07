@@ -3,6 +3,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile/features/auth/data/presentation/provider/auth_provider.dart';
 
+import '../features/auth/data/presentation/provider/auth_provider.dart';
 import 'auth_common.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -21,6 +22,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  String _selectedRole = 'CUSTOMER';
 
   @override
   void dispose() {
@@ -31,15 +33,25 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
-  void _onSignupPressed() {
+  Future<void> _onSignupPressed() async {
     FocusScope.of(context).unfocus();
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    // TODO: call your AuthProvider.register(name, email, password) here.
-    // Do not use login() to create a new account.
-    Fluttertoast.showToast(
-      msg: 'Form validated. Registration service is not connected yet.',
+    final auth = context.read<AuthProvider>();
+    final success = await auth.register(
+      name: _nameController.text.trim(),
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+      role: _selectedRole,
     );
+    if (!mounted) return;
+
+    if (success) {
+      Fluttertoast.showToast(msg: 'Account created successfully.');
+      Navigator.of(context).pop(true);
+    } else {
+      Fluttertoast.showToast(msg: auth.errorMessage ?? 'Sign-up failed.');
+    }
   }
 
   Future<void> _onGooglePressed() async {
@@ -70,6 +82,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -90,6 +103,34 @@ class _SignupScreenState extends State<SignupScreen> {
                       subtitle: 'Enter your details to get started',
                     ),
                     const SizedBox(height: 24),
+                    if (auth.errorMessage != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          border: Border.all(color: Colors.red.shade200),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              auth.errorMessage!,
+                              style: TextStyle(
+                                color: Colors.red.shade800,
+                                fontSize: 13,
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: _onSignupPressed,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
 
                     TextFormField(
                       controller: _nameController,
@@ -124,6 +165,36 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                     const SizedBox(height: 14),
 
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedRole,
+                      decoration: authFieldDecoration(
+                        label: 'Account type',
+                        hint: 'Choose an account type',
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'CUSTOMER',
+                          child: Text('Customer'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'ORGANIZER',
+                          child: Text('Organizer'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'VALIDATOR',
+                          child: Text('Validator'),
+                        ),
+                      ],
+                      onChanged: auth.isLoading
+                          ? null
+                          : (role) {
+                              if (role != null) {
+                                setState(() => _selectedRole = role);
+                              }
+                            },
+                    ),
+                    const SizedBox(height: 14),
+
                     TextFormField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
@@ -134,8 +205,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         hint: 'Create a password',
                         suffixIcon: _eyeButton(
                           _obscurePassword,
-                              () => setState(
-                                  () => _obscurePassword = !_obscurePassword),
+                          () => setState(
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
                         ),
                       ),
                       validator: validateNewPassword,
@@ -153,8 +225,10 @@ class _SignupScreenState extends State<SignupScreen> {
                         hint: 'Re-enter your password',
                         suffixIcon: _eyeButton(
                           _obscureConfirmPassword,
-                              () => setState(() => _obscureConfirmPassword =
-                          !_obscureConfirmPassword),
+                          () => setState(
+                            () => _obscureConfirmPassword =
+                                !_obscureConfirmPassword,
+                          ),
                         ),
                       ),
                       validator: (v) {
@@ -169,8 +243,12 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    PrimaryButton(
-                        label: 'Create account', onPressed: _onSignupPressed),
+                    auth.isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : PrimaryButton(
+                            label: 'Create account',
+                            onPressed: _onSignupPressed,
+                          ),
                     const SizedBox(height: 20),
                     const OrDivider(),
                     const SizedBox(height: 20),
@@ -189,19 +267,22 @@ class _SignupScreenState extends State<SignupScreen> {
                         style: TextStyle(fontSize: 12, color: Colors.black45),
                         children: [
                           TextSpan(
-                              text: 'By creating an account, you agree to our '),
+                            text: 'By creating an account, you agree to our ',
+                          ),
                           TextSpan(
                             text: 'Terms of Service',
                             style: TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.w500),
+                              color: Colors.black,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                           TextSpan(text: ' and '),
                           TextSpan(
                             text: 'Privacy Policy',
                             style: TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.w500),
+                              color: Colors.black,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ],
                       ),

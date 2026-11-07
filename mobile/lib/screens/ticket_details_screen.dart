@@ -6,6 +6,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../models/ticket.dart';
 import '../theme/app_colors.dart';
 import '../utils/format.dart';
+import '../widgets/offline_banner.dart';
+import '../widgets/retry_error_view.dart';
 
 class TicketDetailsScreen extends StatefulWidget {
   final Ticket ticket;
@@ -13,6 +15,7 @@ class TicketDetailsScreen extends StatefulWidget {
   final bool isOffline;
   final Future<bool> Function(Ticket) onDownload;
   final Future<bool> Function(Ticket)? onDelete;
+  final Future<Ticket> Function(String)? onRefresh;
 
   const TicketDetailsScreen({
     super.key,
@@ -21,6 +24,7 @@ class TicketDetailsScreen extends StatefulWidget {
     this.isOffline = false,
     required this.onDownload,
     this.onDelete,
+    this.onRefresh,
   });
 
   @override
@@ -29,13 +33,42 @@ class TicketDetailsScreen extends StatefulWidget {
 
 class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
   late bool _saved;
+  late Ticket _ticket;
+  late bool _offline;
   bool _saving = false;
   bool _deleting = false;
+  bool _refreshing = false;
+  String? _detailError;
 
   @override
   void initState() {
     super.initState();
     _saved = widget.isSaved;
+    _ticket = widget.ticket;
+    _offline = widget.isOffline;
+    _refreshDetails();
+  }
+
+  Future<void> _refreshDetails() async {
+    final onRefresh = widget.onRefresh;
+    if (onRefresh == null || _offline) return;
+    setState(() {
+      _refreshing = true;
+      _detailError = null;
+    });
+    try {
+      final refreshed = await onRefresh(_ticket.id);
+      if (mounted) setState(() => _ticket = refreshed);
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _offline = true;
+          _detailError = error.toString();
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
+    }
   }
 
   Future<void> _deleteTicket() async {
@@ -47,7 +80,7 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Remove from this device?'),
         content: Text(
-          widget.isOffline
+          _offline
               ? "You're offline, so you won't be able to download this ticket "
                     'again until you reconnect.'
               : 'You can download this ticket again later while online.',
@@ -71,11 +104,11 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
     setState(() => _deleting = true);
 
     try {
-      final removed = await onDelete(widget.ticket);
+      final removed = await onDelete(_ticket);
       if (!mounted) return;
 
       if (removed) {
-        if (widget.isOffline) {
+        if (_offline) {
           // Offline, the ticket is no longer available at all.
           Navigator.pop(context);
         } else {
@@ -93,7 +126,7 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
     });
 
     try {
-      final saved = await widget.onDownload(widget.ticket);
+      final saved = await widget.onDownload(_ticket);
       if (!mounted) return;
 
       setState(() {
@@ -110,7 +143,7 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final canDownload = !_saved && !_saving && !widget.isOffline;
+    final canDownload = !_saved && !_saving && !_offline;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -131,15 +164,20 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (widget.isOffline) ...[
-                const _InfoBanner(
-                  icon: Icons.cloud_off,
-                  text:
-                      "You're offline. Showing the copy saved on this device. "
-                      'Details may have changed since it was last updated.',
+              if (_offline) ...[
+                OfflineBanner(
+                  message: _detailError == null
+                      ? "You're offline. Showing saved ticket details."
+                      : 'Showing saved ticket details; the latest refresh failed.',
                 ),
+                if (_detailError != null && widget.onRefresh != null)
+                  RetryErrorView(
+                    message: _detailError!,
+                    onRetry: _refreshing ? () {} : _refreshDetails,
+                  ),
                 const SizedBox(height: 12),
               ],
+              if (_refreshing) const LinearProgressIndicator(),
               Container(
                 decoration: BoxDecoration(
                   color: AppColors.surface,
@@ -159,72 +197,73 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
                           ),
                           padding: const EdgeInsets.all(16),
                           // Encodes the full ticket payload for organizer scanning.
-                          child: QrImageView(
-                            data: widget.ticket.qrPayload,
-                            version: QrVersions.auto,
-                            size: qrSize,
-                            backgroundColor: Colors.white,
-                          ),
+                          child: _ticket.qrPayload.isEmpty
+                              ? const SizedBox(
+                                  width: 220,
+                                  height: 150,
+                                  child: Center(
+                                    child: Text(
+                                      'QR code is unavailable for this ticket.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(color: Colors.black87),
+                                    ),
+                                  ),
+                                )
+                              : QrImageView(
+                                  data: _ticket.qrPayload,
+                                  version: QrVersions.auto,
+                                  size: qrSize,
+                                  backgroundColor: Colors.white,
+                                ),
                         ),
                         const SizedBox(height: 20),
                         _TicketDetailRow(
                           label: 'Event',
-                          value: widget.ticket.eventName,
+                          value: _ticket.eventName,
                         ),
                         _TicketDetailRow(
                           label: 'Ticket Type',
-                          value: widget.ticket.ticketType,
+                          value: _ticket.ticketType,
                         ),
-                        _TicketDetailRow(
-                          label: 'Ticket ID',
-                          value: widget.ticket.id,
-                        ),
-                        if (widget.ticket.buyerName.isNotEmpty ||
-                            widget.ticket.buyerEmail.isNotEmpty)
+                        _TicketDetailRow(label: 'Ticket ID', value: _ticket.id),
+                        if (_ticket.buyerName.isNotEmpty ||
+                            _ticket.buyerEmail.isNotEmpty)
                           _TicketHolderRow(
-                            name: widget.ticket.buyerName,
-                            email: widget.ticket.buyerEmail,
+                            name: _ticket.buyerName,
+                            email: _ticket.buyerEmail,
                           ),
-                        if (widget.ticket.paymentId.isNotEmpty)
+                        if (_ticket.paymentId.isNotEmpty)
                           _TicketDetailRow(
                             label: 'Payment ID',
-                            value: widget.ticket.paymentId,
+                            value: _ticket.paymentId,
                             selectable: true,
                           ),
-                        if (widget.ticket.orderId.isNotEmpty)
+                        if (_ticket.orderId.isNotEmpty)
                           _TicketDetailRow(
                             label: 'Order ID',
-                            value: widget.ticket.orderId,
+                            value: _ticket.orderId,
                           ),
                         _TicketDetailRow(
                           label: 'User ID',
-                          value: widget.ticket.userId,
+                          value: _ticket.userId,
                         ),
                         _TicketDetailRow(
                           label: 'Payment ID',
-                          value: widget.ticket.paymentId,
+                          value: _ticket.paymentId,
                         ),
                         _TicketDetailRow(
                           label: 'Price',
-                          value: 'MWK ${formatPrice(widget.ticket.price)}',
+                          value: 'MWK ${formatPrice(_ticket.price)}',
                         ),
+                        _TicketDetailRow(label: 'Venue', value: _ticket.venue),
+                        _TicketDetailRow(label: 'Date', value: _ticket.date),
                         _TicketDetailRow(
-                          label: 'Venue',
-                          value: widget.ticket.venue,
-                        ),
-                        _TicketDetailRow(
-                          label: 'Date',
-                          value: widget.ticket.date,
-                        ),
-                        _TicketDetailRow(
-                          label: widget.isOffline
-                              ? 'Status (last known)'
-                              : 'Status',
-                          value: widget.ticket.status,
+                          label: _offline ? 'Status (last known)' : 'Status',
+                          value: _ticket.status,
                         ),
                         _TicketDetailRow(
                           label: 'Entry',
-                          value: widget.ticket.used ? 'Used' : 'Not used',
+                          value: _ticket.used ? 'Used' : 'Not used',
                         ),
                         const SizedBox(height: 16),
                         const Text(
@@ -232,7 +271,7 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
                           textAlign: TextAlign.center,
                           style: TextStyle(color: Colors.white70),
                         ),
-                        if (widget.isOffline) ...[
+                        if (_offline) ...[
                           const SizedBox(height: 8),
                           const Text(
                             'Ticket validity is confirmed at the gate.',
@@ -240,10 +279,10 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
                             style: TextStyle(color: Colors.white70),
                           ),
                         ],
-                        if (widget.ticket.purchasedOn.isNotEmpty) ...[
+                        if (_ticket.purchasedOn.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Text(
-                            'Purchased: ${widget.ticket.purchasedOn}',
+                            'Purchased: ${_ticket.purchasedOn}',
                             textAlign: TextAlign.center,
                             style: const TextStyle(color: Colors.white70),
                           ),
@@ -334,41 +373,11 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
       );
     }
 
-    if (widget.isOffline) {
+    if (_offline) {
       return const Text('Connect to download');
     }
 
     return const Text('Download Ticket');
-  }
-}
-
-class _InfoBanner extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _InfoBanner({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.orange.shade800,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.white, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 

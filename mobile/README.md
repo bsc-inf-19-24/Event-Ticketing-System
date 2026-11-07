@@ -16,22 +16,43 @@ For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
 
-## Password recovery
+## Offline ticket storage
 
-When `API_BASE_URL` is empty, the app uses an in-memory demo service. It accepts
-the seeded demo accounts, displays the generated 6-digit code in the app instead
-of sending email, and expires codes after 10 minutes. A successful reset updates
-the mock account password for the current app session.
+Downloaded tickets are stored in the application's SQLite database, including
+their event details, price, status, QR data, and download date. Ticket IDs are
+unique, and downloaded tickets remain available after the app is closed and
+reopened. Tickets saved by earlier versions in local preferences are imported
+into SQLite the first time the database is opened.
+## Server connection and authentication
 
-With a backend configured, the app expects:
+The app connects to `http://10.0.2.2:8080` by default (the Android emulator's
+host-machine address). Override it with `--dart-define=API_BASE_URL=https://...`
+or change it in **Profile > Settings > Server connection**. Enter the server
+origin without an `/api` suffix. Requests time out after 15 seconds and report a
+retryable connection message when the server cannot be reached.
 
-- `POST /auth/forgot-password` with `{"email":"..."}`. The backend should send a
-  short-lived verification code by email and return a success message. Do not
-  return the verification code in the response.
-- `POST /auth/reset-password` with
+The app uses these backend routes:
+
+- `POST /api/auth/register` with name, email, password, and role
+  (`CUSTOMER`, `ORGANIZER`, or `VALIDATOR`).
+- `POST /api/auth/login` with email and password. Login and registration return
+  `token` (or `accessToken`) and `refreshToken`.
+- `POST /api/auth/google` with `{"idToken":"..."}` and
+  `GET /api/auth/qr/{text}` returning a PNG image.
+- `POST /api/auth/refresh` with `{"refreshToken":"..."}`.
+- `GET /api/customers/me` to restore the current session.
+- `PUT /api/customers/me` to update the current profile.
+- `POST /api/auth/forgot-password` with `{"email":"..."}`. The backend should
+  send a short-lived verification code by email and must not return the code.
+- `POST /api/auth/reset-password` with
   `{"email":"...","code":"...","newPassword":"..."}`. The backend must enforce
   code validity, expiry, and one-time use, then securely hash and save the new
-  password. Return a JSON response with a 2xx status to complete the reset.
+  password.
+
+Access and refresh tokens are stored in platform secure storage. Expired access
+tokens are refreshed once and the original request is retried. Logging out clears
+both tokens. Set `--dart-define=USE_FAKE_AUTH=true` only to use the in-memory
+demo accounts and password-reset flow instead of the server.
 
 The app validates password complexity and confirmation before submitting. Code
 validation and password persistence remain server responsibilities in production.
@@ -87,3 +108,5 @@ customer taps **I completed payment — verify**. The app asks the backend to
 verify the transaction and creates tickets only when it confirms a matching
 successful MWK payment. Set the PayChangu dashboard and backend URLs to reachable
 HTTPS endpoints before testing real payments.
+The app validates signup fields before submitting. Authentication, profile
+validation, password reset, and token issuance remain server responsibilities.
