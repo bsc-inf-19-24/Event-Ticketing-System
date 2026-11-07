@@ -9,6 +9,7 @@ class Ticket {
   final int price;
   final String purchasedOn;
   final String imagePath;
+  final String downloadedAt;
   final String userId;
   final String paymentId;
   final bool used;
@@ -28,6 +29,7 @@ class Ticket {
     this.price = 0,
     this.purchasedOn = '',
     this.imagePath = '',
+    this.downloadedAt = '',
     this.userId = '',
     this.paymentId = '',
     this.used = false,
@@ -90,6 +92,7 @@ class Ticket {
     'price': price,
     'purchasedOn': purchasedOn,
     'imagePath': imagePath,
+    'downloadedAt': downloadedAt,
     'userId': userId,
     'paymentId': paymentId,
     'used': used,
@@ -101,6 +104,17 @@ class Ticket {
 
   factory Ticket.fromJson(Map<String, dynamic> json) {
     return Ticket(
+      id: json['id'] as String,
+      eventName: json['eventName'] as String,
+      date: json['date'] as String,
+      venue: json['venue'] as String,
+      status: json['status'] as String,
+      qrData: json['qrData'] as String,
+      ticketType: (json['ticketType'] as String?) ?? 'Standard',
+      price: (json['price'] as num?)?.toInt() ?? 0,
+      purchasedOn: (json['purchasedOn'] as String?) ?? '',
+      imagePath: (json['imagePath'] as String?) ?? '',
+      downloadedAt: (json['downloadedAt'] as String?) ?? '',
       id: _stringValue(json['id']),
       eventName: _stringValue(json['eventName'], fallback: 'Event'),
       date: _stringValue(json['date']),
