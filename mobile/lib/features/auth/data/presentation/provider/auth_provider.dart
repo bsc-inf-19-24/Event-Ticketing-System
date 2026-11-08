@@ -10,7 +10,10 @@ import 'package:mobile/features/auth/logic/auth_controller.dart';
 import 'package:mobile/features/auth/models/app_user.dart';
 
 const _googleClientId = String.fromEnvironment('GOOGLE_CLIENT_ID');
-const _googleServerClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
+const _googleServerClientId = String.fromEnvironment(
+  'GOOGLE_SERVER_CLIENT_ID',
+  defaultValue: '837271104289-k5fgkt8bu19vasi84c49tg5ioi09pkla.apps.googleusercontent.com',
+);
 Future<void>? _googleSignInInitialization;
 
 class AuthProvider extends ChangeNotifier {

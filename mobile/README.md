@@ -66,20 +66,24 @@ find the account, and return the same JSON shape as `POST /auth/login`, includin
 a non-empty `token` (or `accessToken`). The Google ID token must not be used as
 the application session token.
 
-Configure platform OAuth clients in Google Cloud Console. If client IDs are not
-provided by platform configuration, pass them at build time:
+The backend's web OAuth client ID is configured as the default server client ID
+in the app, so the returned Google ID token is issued for the backend's
+audience. To override it, or to provide a platform-specific iOS client ID, use:
 
 ```sh
 flutter run \
   --dart-define=API_BASE_URL=https://your-api.example.com \
-  --dart-define=GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com \
-  --dart-define=GOOGLE_SERVER_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
+  --dart-define=GOOGLE_SERVER_CLIENT_ID=your-web-client-id.apps.googleusercontent.com \
+  --dart-define=GOOGLE_CLIENT_ID=your-ios-client-id.apps.googleusercontent.com
 ```
 
-Register the Android package name and signing certificate fingerprints, and add
-the iOS URL scheme/client configuration for supported platforms. Google sign-in
-requires a configured backend because the mock service cannot verify Google
-identity tokens.
+In Google Cloud Console, register the Android app using its package name
+(`com.example.mobile`) and signing-certificate SHA-1 fingerprints. For iOS,
+configure an iOS OAuth client and its reversed-client-ID URL scheme. Native
+Google Sign-In uses these platform registrations rather than a custom web
+redirect URI. Google sign-in requires a configured backend because the mock
+service cannot verify Google identity tokens. Never include the OAuth client
+secret in the Flutter app.
 
 ## PayChangu payments
 
