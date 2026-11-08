@@ -10,6 +10,10 @@ import 'ticket_database_factory.dart'
     if (dart.library.html) 'ticket_database_factory_web.dart';
 
 class TicketStorage {
+  TicketStorage({this.databasePath, this.databaseName = 'event_tickets.db'});
+
+  static const _webStorageKey = 'saved_tickets_web';
+  static final Map<String, Future<Database>> _databases = {};
   TicketStorage({this.databasePath, this.databaseName = 'tickets.db'});
 
   static const _legacyStorageKey = 'saved_demo_tickets';
@@ -23,6 +27,18 @@ class TicketStorage {
   final String databaseName;
   Future<Database>? _database;
 
+  Future<Database> get _db async {
+    if (kIsWeb) throw UnsupportedError('SQLite is unavailable on web.');
+    initializeTicketDatabaseFactory();
+    final file =
+        databasePath ?? path.join(await getDatabasesPath(), databaseName);
+    final opening = _databases.putIfAbsent(file, () => _openDatabase(file));
+    try {
+      _database = opening;
+      return await opening;
+    } catch (_) {
+      _databases.remove(file);
+      rethrow;
   Future<Database> get _db => _database ??= _openDatabase();
 
   Future<Database> _openDatabase() async {
@@ -115,13 +131,31 @@ class TicketStorage {
         }
       });
     }
-
-    final migrated = await preferences.setBool(_legacyMigrationKey, true);
-    if (!migrated) {
-      throw StateError('Could not record ticket storage migration.');
-    }
   }
 
+  Future<Database> _openDatabase(String file) => openDatabase(
+    file,
+    version: 1,
+    onCreate: (database, version) async {
+      await database.execute('''
+        CREATE TABLE tickets (
+          user_id TEXT NOT NULL,
+          ticket_id TEXT NOT NULL,
+          payload TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (user_id, ticket_id)
+        )
+      ''');
+      await database.execute('''
+        CREATE TABLE ticket_sync (
+          user_id TEXT PRIMARY KEY NOT NULL,
+          synced_at TEXT NOT NULL
+        )
+      ''');
+    },
+  );
+
+  Future<List<Ticket>> getSavedTickets({String? userId}) async {
   Future<List<Ticket>> getSavedTickets({String? userId}) async {
     if (kIsWeb) {
       final tickets = await _readWebTickets();
@@ -167,6 +201,12 @@ class TicketStorage {
       await _writeWebTickets([...tickets, ticket]);
       return;
     }
+    final database = await _db;
+    final rows = await database.query(
+      'tickets',
+      where: userId == null ? null : 'user_id = ?',
+      whereArgs: userId == null ? null : [userId],
+      orderBy: 'updated_at ASC',
 
     await (await _db).insert(
       _ticketTable,
@@ -175,24 +215,40 @@ class TicketStorage {
     );
   }
 
+  Future<Ticket?> getTicket(String id) async {
+    final saved = await getSavedTickets();
+    for (final ticket in saved) {
+      if (ticket.id == id) return ticket;
+    }
+    return null;
+  }
+
+  Future<void> saveTicket(Ticket ticket) => saveTickets([ticket]);
+
   Future<void> saveTickets(List<Ticket> tickets) async {
     if (tickets.isEmpty) return;
     _validateTickets(tickets);
     if (kIsWeb) {
-      final saved = await _readWebTickets();
-      final byKey = {for (final ticket in saved) _key(ticket): ticket};
+      final existing = await _readWebTickets();
+      final map = {for (final ticket in existing) _key(ticket): ticket};
       for (final ticket in tickets) {
-        byKey[_key(ticket)] = ticket;
+        map[_key(ticket)] = ticket;
       }
-      await _writeWebTickets(byKey.values.toList());
+      await _writeWebTickets(map.values.toList());
       return;
     }
-
     final database = await _db;
     final batch = database.batch();
+    final now = DateTime.now().toIso8601String();
     final timestamp = DateTime.now();
     for (final ticket in tickets) {
+      final prepared = ticket.downloadedAt.isEmpty
+          ? ticket.copyWith(downloadedAt: now)
+          : ticket;
       batch.insert(
+        'tickets',
+        _ticketRow(prepared, now),
+        conflictAlgorithm: ConflictAlgorithm.ignore,
         _ticketTable,
         _ticketRow(ticket, timestamp),
         conflictAlgorithm: ConflictAlgorithm.replace,
@@ -232,6 +288,95 @@ class TicketStorage {
     if (remoteTickets.any((ticket) => ticket.userId != userId)) {
       throw StateError('Cannot cache tickets owned by another user.');
     }
+    if (kIsWeb) {
+      final existing = await _readWebTickets();
+      await _writeWebTickets([
+        ...existing.where((ticket) => ticket.userId != userId),
+        ...remoteTickets,
+      ]);
+      return;
+    }
+    final database = await _db;
+    await database.transaction((transaction) async {
+      await transaction.delete(
+        'tickets',
+        where: 'user_id = ?',
+        whereArgs: [userId],
+      );
+      final now = DateTime.now().toIso8601String();
+      for (final ticket in remoteTickets) {
+        await transaction.insert(
+          'tickets',
+          _ticketRow(ticket, now),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await transaction.insert('ticket_sync', {
+        'user_id': userId,
+        'synced_at': now,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    });
+  }
+
+  Future<DateTime?> getLastSynced({String? userId}) async {
+    if (kIsWeb) return null;
+    final database = await _db;
+    final rows = userId == null
+        ? await database.query('ticket_sync', limit: 1)
+        : await database.query(
+            'ticket_sync',
+            where: 'user_id = ?',
+            whereArgs: [userId],
+            limit: 1,
+          );
+    final value = rows.isEmpty ? null : rows.first['synced_at'];
+    return value is String ? DateTime.tryParse(value) : null;
+  }
+
+  Future<void> updateTicket(Ticket ticket) async {
+    final old = await getTicket(ticket.id);
+    final updated = ticket.downloadedAt.isEmpty && old != null
+        ? ticket.copyWith(downloadedAt: old.downloadedAt)
+        : ticket;
+    if (kIsWeb) {
+      final tickets = await _readWebTickets();
+      final key = _key(updated);
+      final map = {for (final saved in tickets) _key(saved): saved};
+      map[key] = updated;
+      await _writeWebTickets(map.values.toList());
+      return;
+    }
+    await (await _db).insert(
+      'tickets',
+      _ticketRow(updated, DateTime.now().toIso8601String()),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> refreshSavedTickets(List<Ticket> remote) async {
+    final saved = await getSavedTickets();
+    final byId = {for (final ticket in remote) ticket.id: ticket};
+    await saveTickets(
+      saved.map((ticket) => byId[ticket.id] ?? ticket).toList(),
+    );
+  }
+
+  Future<void> deleteTicket(String id, {String? userId}) async {
+    if (kIsWeb) {
+      final tickets = await _readWebTickets();
+      await _writeWebTickets(
+        tickets.where((ticket) {
+          final sameTicket = ticket.id == id;
+          return !sameTicket || (userId != null && ticket.userId != userId);
+        }).toList(),
+      );
+      return;
+    }
+    final database = await _db;
+    await database.delete(
+      'tickets',
+      where: userId == null ? 'ticket_id = ?' : 'ticket_id = ? AND user_id = ?',
+      whereArgs: userId == null ? [id] : [id, userId],
 
     final timestamp = DateTime.now();
     if (kIsWeb) {
@@ -345,6 +490,10 @@ class TicketStorage {
     if (databaseFuture == null) return;
     await (await databaseFuture).close();
     _database = null;
+    _databases.removeWhere((_, opening) => identical(opening, databaseFuture));
+  }
+
+  Map<String, Object?> _ticketRow(Ticket ticket, String timestamp) => {
   }
 
   Map<String, Object?> _ticketRow(Ticket ticket, DateTime updatedAt) => {
@@ -363,15 +512,14 @@ class TicketStorage {
   };
 
   Ticket _ticketFromRow(Map<String, Object?> row) {
-    final ticket = Ticket.fromJson(
-      Map<String, dynamic>.from(jsonDecode(row['payload']! as String) as Map),
-    );
+    final decoded = jsonDecode(row['payload']! as String) as Map;
+    final ticket = Ticket.fromJson(Map<String, dynamic>.from(decoded));
     return ticket.copyWith(userId: row['user_id']! as String);
   }
 
   Future<List<Ticket>> _readWebTickets() async {
-    final preferences = await SharedPreferences.getInstance();
-    final raw = preferences.getString(_webStorageKey);
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_webStorageKey);
     if (raw == null) return [];
     final decoded = jsonDecode(raw);
     if (decoded is! List) {
@@ -384,6 +532,8 @@ class TicketStorage {
   }
 
   Future<void> _writeWebTickets(List<Ticket> tickets) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
     final preferences = await SharedPreferences.getInstance();
     final saved = await preferences.setString(
       _webStorageKey,

@@ -50,4 +50,6 @@ class SecureStorageService {
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(_legacyTokenKey);
   }
+
+  Future<void> deleteToken() => clearTokens();
 }

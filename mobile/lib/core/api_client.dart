@@ -34,6 +34,7 @@ class ApiClient {
   static const _requestTimeout = Duration(seconds: 15);
 
   Future<dynamic> get(String endpoint, {String? token}) =>
+      _send('GET', endpoint, null, authenticated: true, suppliedToken: token);
       _send('GET', endpoint, null, authenticated: true, tokenOverride: token);
 
   Future<Uint8List> getBytes(
@@ -62,6 +63,7 @@ class ApiClient {
     Map<String, dynamic>? body, {
     String? token,
   }) =>
+      _send('POST', endpoint, body, authenticated: true, suppliedToken: token);
       _send('POST', endpoint, body, authenticated: true, tokenOverride: token);
 
   Future<dynamic> postUnauthenticated(
@@ -92,6 +94,10 @@ class ApiClient {
     Map<String, dynamic>? body, {
     required bool authenticated,
     bool allowTokenRefresh = true,
+    String? suppliedToken,
+  }) async {
+    final token = authenticated
+        ? suppliedToken ?? await tokenProvider?.call()
     String? tokenOverride,
   }) async {
     final token = authenticated

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+
 import 'package:mobile/features/auth/domain/entities/password_reset_request.dart';
 import 'package:mobile/features/auth/domain/entities/user.dart';
 import 'package:mobile/features/auth/domain/repositories/auth_repository.dart';
@@ -34,22 +35,32 @@ class AuthProvider extends ChangeNotifier {
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
-
-  String? _errorMessage;
-  String? get errorMessage => _errorMessage;
-
-  String? _sessionRestoreError;
-  String? get sessionRestoreError => _sessionRestoreError;
-
   bool _isSuccess = false;
   bool get isSuccess => _isSuccess;
-
+  String? _errorMessage;
+  String? get errorMessage => _errorMessage;
+  String? _sessionRestoreError;
+  String? get sessionRestoreError => _sessionRestoreError;
   bool get isLoggedIn => authController.isLoggedIn;
+
+  void _setAuthenticatedUser(User user) {
+    authController.setAuthenticatedUser(
+      AppUser(
+        id: user.id,
+        name: user.name?.trim().isNotEmpty == true
+            ? user.name!.trim()
+            : user.email.split('@').first,
+        email: user.email,
+      ),
+    );
+  }
+
+  String _messageFrom(Object error) =>
+      error.toString().replaceFirst('Exception: ', '');
 
   Future<void> restoreSession() async {
     _isLoading = true;
     _sessionRestoreError = null;
-    _errorMessage = null;
     notifyListeners();
     try {
       final user = await authRepository.restoreSession();
@@ -67,6 +78,22 @@ class AuthProvider extends ChangeNotifier {
     required String email,
     required String password,
     required String role,
+  }) => _runAuth(() async {
+    final user = await registerUseCase.execute(
+      name: name,
+      email: email,
+      password: password,
+      role: role,
+    );
+    _setAuthenticatedUser(user);
+  });
+
+  Future<bool> login(String email, String password) => _runAuth(() async {
+    _setAuthenticatedUser(await loginUseCase.execute(email, password));
+  });
+
+  Future<bool> loginWithGoogle() async {
+    return _runAuth(() async {
   }) async {
     _isLoading = true;
     _errorMessage = null;
@@ -133,6 +160,21 @@ class AuthProvider extends ChangeNotifier {
       final idToken = account.authentication.idToken;
       if (idToken == null || idToken.isEmpty) {
         throw Exception(
+          'Google did not return an ID token. Check OAuth setup.',
+        );
+      }
+      _setAuthenticatedUser(await authRepository.loginWithGoogle(idToken));
+    });
+  }
+
+  Future<bool> _runAuth(Future<void> Function() action) async {
+    _isLoading = true;
+    _errorMessage = null;
+    _sessionRestoreError = null;
+    _isSuccess = false;
+    notifyListeners();
+    try {
+      await action();
           'Google did not return an ID token. Check your OAuth client configuration.',
         );
       }
@@ -149,14 +191,12 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> logout() async {
+  Future<PasswordResetRequest> requestPasswordReset(String email) async {
     _isLoading = true;
     _errorMessage = null;
-    _sessionRestoreError = null;
     notifyListeners();
     try {
-      await authRepository.logout();
-      authController.logOut();
+      return await passwordResetUseCase.requestReset(email);
     } catch (error) {
       _errorMessage = _messageFrom(error);
       rethrow;
@@ -217,6 +257,12 @@ class AuthProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> logout() async {
+    await authRepository.logout();
+    authController.logOut();
+    notifyListeners();
   }
 
   void clearError() {
