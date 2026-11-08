@@ -20,6 +20,7 @@ import 'screens/main_shell.dart';
 
 const _configuredApiBaseUrl = String.fromEnvironment('API_BASE_URL');
 
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ApiConfig.load();
@@ -35,6 +36,13 @@ Future<void> main() async {
 
   apiClient.tokenProvider = secureStorage.getToken;
   if (!useFakeAuth) {
+  apiClient.tokenProvider = secureStorage.getToken;
+
+  final AuthRemoteDataSource remoteDataSource = ApiConfig.useFakeAuth
+      ? MockAuthRemoteDataSource()
+      : apiAuthService;
+
+  if (!ApiConfig.useFakeAuth) {
     apiClient.tokenRefresher = () async {
       final refreshToken = await secureStorage.getRefreshToken();
       if (refreshToken == null || refreshToken.isEmpty) return null;
@@ -62,6 +70,11 @@ Future<void> main() async {
       authRepository: repository,
       passwordResetUseCase: PasswordResetUseCase(repository: repository),
       restoreSessionOnLaunch: !useFakeAuth,
+      loginUseCase: loginUseCase,
+      registerUseCase: registerUseCase,
+      passwordResetUseCase: passwordResetUseCase,
+      authRepository: authRepository,
+      restoreSessionOnLaunch: !ApiConfig.useFakeAuth,
     ),
   );
 }
@@ -100,6 +113,37 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: Colors.white,
+  final PasswordResetUseCase passwordResetUseCase;
+  final AuthRepository? authRepository;
+  final bool restoreSessionOnLaunch;
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) {
+            final authProvider = AuthProvider(
+              loginUseCase: loginUseCase,
+              registerUseCase: registerUseCase,
+              passwordResetUseCase: passwordResetUseCase,
+              authRepository: authRepository,
+            );
+            if (restoreSessionOnLaunch) {
+              unawaited(authProvider.restoreSession());
+            }
+            return authProvider;
+          },
+        ),
+      ],
+      child: MaterialApp(
+        title: 'Ticket Master',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          useMaterial3: true,
+          scaffoldBackgroundColor: Colors.white,
+        ),
+        home: const MainShell(),
       ),
       home: const MainShell(),
     ),

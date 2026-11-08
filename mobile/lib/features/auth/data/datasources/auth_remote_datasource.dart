@@ -29,6 +29,9 @@ class ApiAuthService implements AuthRemoteDataSource {
   Map<String, dynamic> _map(dynamic value) {
     if (value is Map<String, dynamic>) return value;
     if (value is Map) return Map<String, dynamic>.from(value);
+  Map<String, dynamic> _responseMap(dynamic response) {
+    if (response is Map<String, dynamic>) return response;
+    if (response is Map) return Map<String, dynamic>.from(response);
     throw const ApiException('The server returned an invalid response.');
   }
 
@@ -59,6 +62,13 @@ class ApiAuthService implements AuthRemoteDataSource {
           }),
         ),
       );
+  Future<UserModel> login(String email, String password) async {
+    final response = await apiClient.postUnauthenticated('/api/auth/login', {
+      'email': email.trim(),
+      'password': password,
+    });
+    return UserModel.fromJson(_responseMap(response));
+  }
 
   @override
   Future<UserModel> loginWithGoogle(String idToken) async {
@@ -73,6 +83,16 @@ class ApiAuthService implements AuthRemoteDataSource {
       ),
     );
   }
+    final response = await apiClient.postUnauthenticated('/api/auth/google', {
+      'idToken': idToken,
+    });
+    return UserModel.fromJson(_responseMap(response));
+  }
+
+  Future<List<int>> generateQrImage(String text) => apiClient.getBytes(
+    '/api/auth/qr/${Uri.encodeComponent(text)}',
+    authenticated: false,
+  );
 
   Future<List<int>> generateQrImage(String text) => apiClient.getBytes(
     '/api/auth/qr/${Uri.encodeComponent(text)}',
@@ -100,6 +120,11 @@ class ApiAuthService implements AuthRemoteDataSource {
         'email': email.trim(),
       }),
     );
+    final response = await apiClient.postUnauthenticated(
+      '/api/auth/forgot-password',
+      {'email': email.trim()},
+    );
+    final body = _responseMap(response);
     return PasswordResetRequest(
       message: response['message'] is String
           ? response['message'] as String

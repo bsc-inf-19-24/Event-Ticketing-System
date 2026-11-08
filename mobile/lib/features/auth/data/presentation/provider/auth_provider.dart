@@ -91,6 +91,60 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> loginWithGoogle() async {
     return _runAuth(() async {
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    _sessionRestoreError = null;
+    _isSuccess = false;
+    notifyListeners();
+
+    try {
+      final user = await registerUseCase.execute(
+        name: name,
+        email: email,
+        password: password,
+        role: role,
+      );
+      _setAuthenticatedUser(user);
+      _isSuccess = true;
+      return true;
+    } catch (error) {
+      _errorMessage = _messageFrom(error);
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> login(String email, String password) async {
+    _isLoading = true;
+    _errorMessage = null;
+    _sessionRestoreError = null;
+    _isSuccess = false;
+    notifyListeners();
+
+    try {
+      final user = await loginUseCase.execute(email, password);
+      _setAuthenticatedUser(user);
+      _isSuccess = true;
+      return true;
+    } catch (error) {
+      _errorMessage = _messageFrom(error);
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> loginWithGoogle() async {
+    _isLoading = true;
+    _errorMessage = null;
+    _sessionRestoreError = null;
+    _isSuccess = false;
+    notifyListeners();
+    try {
       final google = GoogleSignIn.instance;
       _googleSignInInitialization ??= google.initialize(
         clientId: _googleClientId.isEmpty ? null : _googleClientId,
@@ -118,6 +172,11 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     try {
       await action();
+          'Google did not return an ID token. Check your OAuth client configuration.',
+        );
+      }
+      final user = await authRepository.loginWithGoogle(idToken);
+      _setAuthenticatedUser(user);
       _isSuccess = true;
       return true;
     } catch (error) {
@@ -128,6 +187,36 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<PasswordResetRequest> requestPasswordReset(String email) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      return await passwordResetUseCase.requestReset(email);
+    } catch (error) {
+      _errorMessage = _messageFrom(error);
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  void _setAuthenticatedUser(User user) {
+    authController.setAuthenticatedUser(
+      AppUser(
+        id: user.id,
+        name: user.name?.isNotEmpty == true
+            ? user.name!
+            : user.email.split('@').first,
+        email: user.email,
+      ),
+    );
+  }
+
+  String _messageFrom(Object error) =>
+      error.toString().replaceFirst('Exception: ', '');
 
   Future<PasswordResetRequest> requestPasswordReset(String email) async {
     _isLoading = true;

@@ -65,7 +65,7 @@ class TicketRepository {
     return TicketListResult(
       tickets: cached.reversed.toList(),
       savedIds: cached.map((ticket) => ticket.id).toSet(),
-      isOffline: api != null && !hasConnection,
+      isOffline: !hasConnection,
       lastSynced: await _storage.getLastSynced(userId: userId),
     );
   }
