@@ -4,19 +4,23 @@ class OrderItem {
     required this.ticketTypeName,
     required this.unitPrice,
     required this.quantity,
+    this.ticketTypeId,
   });
 
+  final String? ticketTypeId;
   final String ticketTypeName;
   final int unitPrice;
   final int quantity;
 
   Map<String, dynamic> toJson() => {
+    if (ticketTypeId != null) 'ticketTypeId': ticketTypeId,
     'ticketTypeName': ticketTypeName,
     'unitPrice': unitPrice,
     'quantity': quantity,
   };
 
   factory OrderItem.fromJson(Map<String, dynamic> json) => OrderItem(
+    ticketTypeId: _nullableString(json['ticketTypeId']),
     ticketTypeName: _stringValue(json['ticketTypeName'], fallback: 'Standard'),
     unitPrice: json['unitPrice'] is num
         ? (json['unitPrice'] as num).toInt()
@@ -53,16 +57,16 @@ class Order {
   final String paymentMethod;
   final DateTime createdAt;
 
-  Order copyWith({String? status}) => Order(
+  Order copyWith({String? status, String? txRef, int? total}) => Order(
     id: id,
     userId: userId,
     eventTitle: eventTitle,
     eventVenue: eventVenue,
     eventDate: eventDate,
     items: items,
-    total: total,
+    total: total ?? this.total,
     status: status ?? this.status,
-    txRef: txRef,
+    txRef: txRef ?? this.txRef,
     paymentMethod: paymentMethod,
     createdAt: createdAt,
   );
@@ -116,3 +120,6 @@ class Order {
 
 String _stringValue(dynamic value, {String fallback = ''}) =>
     value is String ? value : fallback;
+
+String? _nullableString(dynamic value) =>
+    value is String && value.trim().isNotEmpty ? value.trim() : null;

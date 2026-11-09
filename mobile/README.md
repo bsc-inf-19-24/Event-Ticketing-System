@@ -85,32 +85,58 @@ redirect URI. Google sign-in requires a configured backend because the mock
 service cannot verify Google identity tokens. Never include the OAuth client
 secret in the Flutter app.
 
-## PayChangu payments
+## Orders, payments, and offline tickets
 
-The Flutter client defaults to the existing offline simulator. To use the hosted
-PayChangu flow, run with `--dart-define=USE_FAKE_PAYMENTS=false` and configure
-`API_BASE_URL` to your authenticated application backend. The app never calls
-PayChangu directly and must never contain the PayChangu secret key.
+The demo launch profile uses sample events and fake payments. To test against
+the Docker backend, start the container and select **Ticket Master - Real API
+(USB device)** from `.vscode/launch.json`. For a USB-connected Android device,
+first run:
 
-The backend needs to provide these authenticated endpoints:
+```sh
+adb reverse tcp:8080 tcp:8080
+```
 
-- `POST /payments/paychangu/checkout`: accept `amount`, `currency`, `email`,
-  `first_name`, `last_name`, `tx_ref`, optional `mobile`, and `meta`; initiate
-  PayChangu's `POST https://api.paychangu.com/payment` using a server-held key;
-  set `callback_url` and `return_url` from server configuration; return PayChangu's
-  hosted checkout response shape (`data.checkout_url` and nested transaction data).
-- `GET /payments/paychangu/verify/{tx_ref}`: call PayChangu's transaction
-  `GET https://api.paychangu.com/verify-payment/{tx_ref}` endpoint on the server and return a response with
-  `data.tx_ref`, `data.status`, `data.currency`, and `data.amount`. Do not rely on
-  the app's return URL or a client confirmation to mark an order paid.
-- A PayChangu webhook endpoint: verify the webhook signature server-side, then
-  update the order idempotently. Issue tickets only after checking the verified
-  transaction reference, currency, amount, and success status.
+The emulator profile uses `http://10.0.2.2:8080`; that address is not for a
+physical Android device. The real profile disables fake authentication,
+payments, and tickets. It also disables demo payment confirmation and local
+ticket fallback. For command-line use, pass the same `--dart-define` values from
+the profile and set `API_BASE_URL` to the reachable backend origin.
 
-The app opens hosted checkout in the browser. After returning to the app, the
-customer taps **I completed payment — verify**. The app asks the backend to
-verify the transaction and creates tickets only when it confirms a matching
-successful MWK payment. Set the PayChangu dashboard and backend URLs to reachable
-HTTPS endpoints before testing real payments.
+The known order routes are `POST /api/orders`, `GET /api/orders/my`, and
+`GET /api/orders/{id}`. The app submits event ID, ticket-type ID, and quantity,
+but never submits a price; the server must calculate the total. The payment
+initiation and demo-confirmation routes and response fields are provisional and
+documented in
+[`lib/features/payment/CONTRACT_ASSUMPTIONS.md`](./lib/features/payment/CONTRACT_ASSUMPTIONS.md).
+Confirm them with the backend team before production use. PayChangu credentials
+must remain on the server.
+
+Android and iOS open the returned HTTPS checkout URL in an in-app WebView;
+browser and desktop platforms use the external browser. Returning to the app
+does not prove payment. Tickets are saved only after the backend reports a paid
+order and returns issued tickets.
+
+The current event catalog is still static sample data and has no API adapter or
+server IDs. In the real profile `USE_FAKE_EVENTS=false` hides those samples, so
+real checkout needs the backend event-list contract and event/ticket-type IDs
+before the UI can offer purchasable events. The app rejects missing IDs rather
+than guessing them.
+
+Tickets returned by the backend are cached per authenticated customer in SQLite
+(mobile) or preferences (web), including the server QR payload. The ticket list
+loads cached records first and refreshes from paid orders when online; ticket
+details use the saved QR payload and remain readable offline.
+
+`USE_FAKE_PAYMENT` is the current payment switch; the legacy
+`USE_FAKE_PAYMENTS` define remains supported. `USE_FAKE_TICKETS` and
+`USE_FAKE_EVENTS` independently control sample data. `ASSUME_PAYMENT_SUCCESS`
+and `ALLOW_LOCAL_TICKET_FALLBACK` default to `false` and should only be enabled
+for explicitly approved demo testing.
+
+Run the mock-backed tests with `flutter test`. These validate request payloads,
+HTTPS checkout URL enforcement, server-issued ticket parsing, and offline
+ticket persistence without contacting the live API.
+
 The app validates signup fields before submitting. Authentication, profile
-validation, password reset, and token issuance remain server responsibilities.
+validation, password reset, payment verification, and ticket issuance remain
+server responsibilities.

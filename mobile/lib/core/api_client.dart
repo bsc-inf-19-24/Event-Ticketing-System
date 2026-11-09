@@ -61,8 +61,15 @@ class ApiClient {
     String endpoint,
     Map<String, dynamic>? body, {
     String? token,
-  }) =>
-      _send('POST', endpoint, body, authenticated: true, suppliedToken: token);
+    Map<String, String> headers = const {},
+  }) => _send(
+    'POST',
+    endpoint,
+    body,
+    authenticated: true,
+    suppliedToken: token,
+    extraHeaders: headers,
+  );
 
   Future<dynamic> postUnauthenticated(
     String endpoint, [
@@ -93,16 +100,29 @@ class ApiClient {
     required bool authenticated,
     bool allowTokenRefresh = true,
     String? suppliedToken,
+    Map<String, String> extraHeaders = const {},
   }) async {
     final token = authenticated
         ? suppliedToken ?? await tokenProvider?.call()
         : null;
-    var response = await _request(method, endpoint, body, token);
+    var response = await _request(
+      method,
+      endpoint,
+      body,
+      token,
+      extraHeaders: extraHeaders,
+    );
 
     if (response.statusCode == 401 && authenticated && allowTokenRefresh) {
       final refreshedToken = await _refreshToken();
       if (refreshedToken != null) {
-        response = await _request(method, endpoint, body, refreshedToken);
+        response = await _request(
+          method,
+          endpoint,
+          body,
+          refreshedToken,
+          extraHeaders: extraHeaders,
+        );
       }
     }
 
@@ -130,8 +150,9 @@ class ApiClient {
     String method,
     String endpoint,
     Map<String, dynamic>? body,
-    String? token,
-  ) async {
+    String? token, {
+    Map<String, String> extraHeaders = const {},
+  }) async {
     final normalizedBase = _effectiveBaseUrl.replaceFirst(RegExp(r'/+$'), '');
     final normalizedPath = endpoint.startsWith('/') ? endpoint : '/$endpoint';
     final uri = Uri.tryParse('$normalizedBase$normalizedPath');
@@ -144,7 +165,8 @@ class ApiClient {
 
     final request = http.Request(method, uri)
       ..headers['Content-Type'] = 'application/json'
-      ..headers['Accept'] = 'application/json';
+      ..headers['Accept'] = 'application/json'
+      ..headers.addAll(extraHeaders);
     if (token != null && token.isNotEmpty) {
       request.headers['Authorization'] = 'Bearer $token';
     }

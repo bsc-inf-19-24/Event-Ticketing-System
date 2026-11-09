@@ -60,7 +60,6 @@ class _TicketsScreenState extends State<TicketsScreen> {
           isSaved: true,
           isOffline: ticketsController.isOffline,
           onDownload: (_) async => true,
-          onRefresh: ticketsController.loadTicketDetails,
         ),
       ),
     );

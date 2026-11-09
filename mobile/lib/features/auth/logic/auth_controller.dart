@@ -16,6 +16,14 @@ class AuthController extends ChangeNotifier {
   /// The currently authenticated user, if any.
   AppUser? get user => _user;
 
+  /// Stable partition key for offline customer data.
+  String? get stableUserId {
+    final current = _user;
+    if (current == null) return null;
+    final id = current.id.trim();
+    return id.isNotEmpty ? id : current.email.trim().toLowerCase();
+  }
+
   /// Whether a user is currently authenticated.
   bool get isLoggedIn => _user != null;
 

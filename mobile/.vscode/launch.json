@@ -1,0 +1,47 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Ticket Master - Demo",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": [
+        "--dart-define=USE_FAKE_AUTH=true",
+        "--dart-define=USE_FAKE_EVENTS=true",
+        "--dart-define=USE_FAKE_PAYMENT=true",
+        "--dart-define=USE_FAKE_TICKETS=true"
+      ]
+    },
+    {
+      "name": "Ticket Master - Real API (USB device)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": [
+        "--dart-define=API_BASE_URL=http://localhost:8080",
+        "--dart-define=USE_FAKE_AUTH=false",
+        "--dart-define=USE_FAKE_EVENTS=false",
+        "--dart-define=USE_FAKE_PAYMENT=false",
+        "--dart-define=USE_FAKE_TICKETS=false",
+        "--dart-define=ASSUME_PAYMENT_SUCCESS=false",
+        "--dart-define=ALLOW_LOCAL_TICKET_FALLBACK=false"
+      ]
+    },
+    {
+      "name": "Ticket Master - Real API (Android emulator)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": [
+        "--dart-define=API_BASE_URL=http://10.0.2.2:8080",
+        "--dart-define=USE_FAKE_AUTH=false",
+        "--dart-define=USE_FAKE_EVENTS=false",
+        "--dart-define=USE_FAKE_PAYMENT=false",
+        "--dart-define=USE_FAKE_TICKETS=false",
+        "--dart-define=ASSUME_PAYMENT_SUCCESS=false",
+        "--dart-define=ALLOW_LOCAL_TICKET_FALLBACK=false"
+      ]
+    }
+  ]
+}
