@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../features/auth/logic/auth_controller.dart';
 import '../features/tickets/logic/tickets_controller.dart';
+import '../features/payment/services/fake_payment_service.dart';
 import 'event_details_screen.dart';
 import '../data/sample_events.dart';
 import '../models/event.dart';
@@ -27,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Events to show, based on the selected chip
   List<Event> get filteredEvents {
+    if (!useFakeEvents) return const [];
     final query = searchQuery.trim().toLowerCase();
     return sampleEvents.where((event) {
       final matchesCategory =
@@ -88,7 +90,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 hasScrollBody: false,
                 child: Center(
                   child: Text(
-                    searchQuery.trim().isNotEmpty
+                    !useFakeEvents
+                        ? 'The real event catalog is not connected yet'
+                        : searchQuery.trim().isNotEmpty
                         ? 'No events found'
                         : 'No events in this category yet',
                     style: const TextStyle(color: Colors.white70),

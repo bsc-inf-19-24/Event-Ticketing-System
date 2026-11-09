@@ -1,8 +1,8 @@
 import 'dart:math';
 
 import '../models/payment_models.dart';
+import 'api_payment_service.dart';
 import 'payment_service.dart';
-import 'paychangu_payment_service.dart';
 
 class _Transaction {
   _Transaction({
@@ -144,12 +144,32 @@ class FakePaymentService implements PaymentService {
   }
 }
 
-const useFakePayments = bool.fromEnvironment(
-  'USE_FAKE_PAYMENTS',
+const useFakePayment = bool.fromEnvironment(
+  'USE_FAKE_PAYMENT',
+  defaultValue: bool.fromEnvironment('USE_FAKE_PAYMENTS', defaultValue: true),
+);
+
+const assumePaymentSuccess = bool.fromEnvironment(
+  'ASSUME_PAYMENT_SUCCESS',
+  defaultValue: false,
+);
+const allowLocalTicketFallback = bool.fromEnvironment(
+  'ALLOW_LOCAL_TICKET_FALLBACK',
+  defaultValue: false,
+);
+const useFakeTickets = bool.fromEnvironment(
+  'USE_FAKE_TICKETS',
+  defaultValue: true,
+);
+const useFakeEvents = bool.fromEnvironment(
+  'USE_FAKE_EVENTS',
   defaultValue: true,
 );
 
-/// Set USE_FAKE_PAYMENTS=false for the backend-backed PayChangu flow.
-final PaymentService paymentService = useFakePayments
+/// Kept as a source-compatible alias for existing widgets and tests.
+const useFakePayments = useFakePayment;
+
+/// Set USE_FAKE_PAYMENT=false for the backend-backed order/payment flow.
+final PaymentService paymentService = useFakePayment
     ? FakePaymentService()
-    : PayChanguPaymentService();
+    : ApiPaymentService();

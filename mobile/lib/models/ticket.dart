@@ -17,6 +17,7 @@ class Ticket {
   final String buyerName;
   final String buyerEmail;
   final String paymentStatus;
+  final String source;
 
   const Ticket({
     required this.id,
@@ -37,6 +38,7 @@ class Ticket {
     this.buyerName = '',
     this.buyerEmail = '',
     this.paymentStatus = '',
+    this.source = 'local',
   });
 
   /// Full ticket payload encoded in the QR code for gate scanning.
@@ -100,6 +102,7 @@ class Ticket {
     'buyerName': buyerName,
     'buyerEmail': buyerEmail,
     'paymentStatus': paymentStatus,
+    'source': source,
   };
 
   factory Ticket.fromJson(Map<String, dynamic> json) {
@@ -122,6 +125,7 @@ class Ticket {
       buyerName: _stringValue(json['buyerName']),
       buyerEmail: _stringValue(json['buyerEmail']),
       paymentStatus: _stringValue(json['paymentStatus']),
+      source: _stringValue(json['source'], fallback: 'local'),
     );
   }
 
@@ -250,6 +254,17 @@ class Ticket {
     );
   }
 
+  factory Ticket.fromServer(
+    Map<String, dynamic> json, {
+    required String authenticatedUserId,
+  }) {
+    final parsed = Ticket.fromApiJson(
+      json,
+      authenticatedUserId: authenticatedUserId,
+    );
+    return parsed.copyWith(source: 'server');
+  }
+
   Ticket copyWith({
     String? id,
     String? eventName,
@@ -269,6 +284,7 @@ class Ticket {
     String? buyerName,
     String? buyerEmail,
     String? paymentStatus,
+    String? source,
   }) => Ticket(
     id: id ?? this.id,
     eventName: eventName ?? this.eventName,
@@ -288,6 +304,7 @@ class Ticket {
     buyerName: buyerName ?? this.buyerName,
     buyerEmail: buyerEmail ?? this.buyerEmail,
     paymentStatus: paymentStatus ?? this.paymentStatus,
+    source: source ?? this.source,
   );
 }
 

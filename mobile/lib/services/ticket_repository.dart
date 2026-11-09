@@ -1,5 +1,7 @@
 import '../core/network/api_client.dart';
 import '../features/tickets/data/ticket_api.dart';
+import '../features/payment/services/api_payment_service.dart';
+import '../features/payment/services/fake_payment_service.dart';
 import '../models/ticket.dart';
 import 'ticket_storage.dart';
 
@@ -18,12 +20,17 @@ class TicketListResult {
 }
 
 class TicketRepository {
-  TicketRepository({TicketStorage? storage, TicketApi? api})
-    : _storage = storage ?? TicketStorage(),
-      _api = api ?? _configuredApi();
+  TicketRepository({
+    TicketStorage? storage,
+    TicketApi? api,
+    ApiPaymentService? ordersApi,
+  }) : _storage = storage ?? TicketStorage(),
+       _api = api ?? (useFakeTickets ? _configuredApi() : null),
+       _ordersApi = ordersApi ?? (useFakeTickets ? null : ApiPaymentService());
 
   final TicketStorage _storage;
   final TicketApi? _api;
+  final ApiPaymentService? _ordersApi;
 
   static TicketApi? _configuredApi() {
     const baseUrl = String.fromEnvironment('API_BASE_URL');
@@ -37,20 +44,24 @@ class TicketRepository {
   }) async {
     if (userId.isEmpty) throw ArgumentError.value(userId, 'userId');
 
+    final cached = await _storage.getSavedTickets(userId: userId);
     final api = _api;
     if (hasConnection && api != null) {
       try {
         final remote = await api.getMyTickets(userId);
-        await _storage.synchronizeUserTickets(userId, remote);
+        final merged = <String, Ticket>{
+          for (final ticket in cached) ticket.id: ticket,
+          for (final ticket in remote) ticket.id: ticket,
+        }.values.toList();
+        await _storage.synchronizeUserTickets(userId, merged);
         return TicketListResult(
-          tickets: remote.reversed.toList(),
-          savedIds: remote.map((ticket) => ticket.id).toSet(),
+          tickets: merged.reversed.toList(),
+          savedIds: merged.map((ticket) => ticket.id).toSet(),
           isOffline: false,
           lastSynced: DateTime.now(),
         );
       } on ApiException catch (error) {
         if (error.statusCode == 401 || error.statusCode == 403) rethrow;
-        final cached = await _storage.getSavedTickets(userId: userId);
         if (cached.isEmpty) rethrow;
         return TicketListResult(
           tickets: cached.reversed.toList(),
@@ -61,13 +72,95 @@ class TicketRepository {
       }
     }
 
-    final cached = await _storage.getSavedTickets(userId: userId);
+    final ordersApi = _ordersApi;
+    if (hasConnection && ordersApi != null) {
+      try {
+        final orders = await ordersApi.getMyOrders();
+        final remote = <Ticket>[];
+        final ids = <String>{};
+        for (final order in orders) {
+          final status = _stringValue([
+            order['status'],
+            order['paymentStatus'],
+            order['payment_status'],
+          ]).toLowerCase();
+          if (!const {
+            'paid',
+            'success',
+            'successful',
+            'completed',
+            'confirmed',
+            'settled',
+          }.contains(status)) {
+            continue;
+          }
+          for (final value in _ticketValues(order)) {
+            final ticket = Ticket.fromServer(
+              value,
+              authenticatedUserId: userId,
+            );
+            if (ticket.id.isEmpty) {
+              throw const ApiException(
+                'The server returned a ticket without an ID.',
+              );
+            }
+            if (ticket.userId != userId) {
+              throw const ApiException(
+                'The server returned a ticket belonging to another account.',
+              );
+            }
+            if (ticket.isIssued && ids.add(ticket.id)) remote.add(ticket);
+          }
+        }
+        final merged = <String, Ticket>{
+          for (final ticket in cached) ticket.id: ticket,
+          for (final ticket in remote) ticket.id: ticket,
+        }.values.toList();
+        await _storage.synchronizeUserTickets(userId, merged);
+        return TicketListResult(
+          tickets: merged.reversed.toList(),
+          savedIds: merged.map((ticket) => ticket.id).toSet(),
+          isOffline: false,
+          lastSynced: DateTime.now(),
+        );
+      } on ApiException catch (error) {
+        if (error.statusCode == 401 || error.statusCode == 403) rethrow;
+        if (cached.isEmpty) rethrow;
+        return TicketListResult(
+          tickets: cached.reversed.toList(),
+          savedIds: cached.map((ticket) => ticket.id).toSet(),
+          isOffline: true,
+          lastSynced: await _storage.getLastSynced(userId: userId),
+        );
+      }
+    }
+
     return TicketListResult(
       tickets: cached.reversed.toList(),
       savedIds: cached.map((ticket) => ticket.id).toSet(),
       isOffline: !hasConnection,
       lastSynced: await _storage.getLastSynced(userId: userId),
     );
+  }
+
+  List<Map<String, dynamic>> _ticketValues(Map<String, dynamic> order) {
+    final raw = order['tickets'] ?? order['ticket'];
+    if (raw is List) {
+      return raw.whereType<Map>().map(Map<String, dynamic>.from).toList();
+    }
+    if (raw is Map) return [Map<String, dynamic>.from(raw)];
+    final nestedOrder = order['order'];
+    if (nestedOrder is Map) {
+      return _ticketValues(Map<String, dynamic>.from(nestedOrder));
+    }
+    return const [];
+  }
+
+  String _stringValue(List<dynamic> values) {
+    for (final value in values) {
+      if (value is String && value.trim().isNotEmpty) return value.trim();
+    }
+    return '';
   }
 
   Future<Ticket> getTicketDetails({

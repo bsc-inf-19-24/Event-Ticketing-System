@@ -1,11 +1,13 @@
 class TicketType {
+  final String? id;
   final String name;
   final int price;
 
-  const TicketType({required this.name, required this.price});
+  const TicketType({this.id, required this.name, required this.price});
 }
 
 class Event {
+  final String? id;
   final String title;
   final String date;
   final String time;
@@ -22,6 +24,7 @@ class Event {
   final String status;
 
   const Event({
+    this.id,
     required this.title,
     required this.date,
     required this.time,

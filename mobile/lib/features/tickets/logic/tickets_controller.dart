@@ -47,7 +47,7 @@ class TicketsController extends ChangeNotifier {
   DateTime? get lastSynced => _lastSynced;
 
   void _onAuthChanged() {
-    final userId = _auth.user?.id;
+    final userId = _auth.stableUserId;
     if (userId == _userId) return;
     _userId = userId;
     _loadGeneration++;
@@ -70,7 +70,7 @@ class TicketsController extends ChangeNotifier {
 
   /// Loads only tickets belonging to the current authenticated user.
   Future<void> load() async {
-    final userId = _auth.user?.id;
+    final userId = _auth.stableUserId;
     _userId = userId;
     final generation = ++_loadGeneration;
     if (userId == null) {
@@ -83,15 +83,24 @@ class TicketsController extends ChangeNotifier {
     }
     _loading = true;
     _errorMessage = null;
-    if (!_disposed) notifyListeners();
     try {
+      final cachedTickets = await _storage.getSavedTickets(userId: userId);
+      final lastSynced = await _storage.getLastSynced(userId: userId);
+      if (_disposed ||
+          generation != _loadGeneration ||
+          _auth.stableUserId != userId) {
+        return;
+      }
+      _tickets = cachedTickets;
+      _lastSynced = lastSynced;
+      if (!_disposed) notifyListeners();
       final result = await _repository.load(
         userId: userId,
         hasConnection: _connectivity.isOnline,
       );
       if (!_disposed &&
           generation == _loadGeneration &&
-          _auth.user?.id == userId) {
+          _auth.stableUserId == userId) {
         _tickets = result.tickets;
         _isOffline = result.isOffline;
         _lastSynced = result.lastSynced;
@@ -117,7 +126,7 @@ class TicketsController extends ChangeNotifier {
 
   /// Persists tickets and updates the current user's list.
   Future<void> addTickets(List<Ticket> tickets) async {
-    final userId = _auth.user?.id;
+    final userId = _auth.stableUserId;
     if (userId == null) throw StateError('A logged-in customer is required.');
     if (tickets.any((ticket) => ticket.userId != userId)) {
       throw StateError('Tickets can only be saved for their owning customer.');
@@ -127,7 +136,7 @@ class TicketsController extends ChangeNotifier {
   }
 
   Future<Ticket> loadTicketDetails(String ticketId) {
-    final userId = _auth.user?.id;
+    final userId = _auth.stableUserId;
     if (userId == null) {
       throw StateError('A logged-in customer is required.');
     }

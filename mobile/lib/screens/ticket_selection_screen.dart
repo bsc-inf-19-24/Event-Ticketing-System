@@ -141,6 +141,7 @@ class _TicketSelectionScreenState extends State<TicketSelectionScreen> {
     final selectedType = _types[selectedIndex];
     final items = [
       OrderItem(
+        ticketTypeId: selectedType.id,
         ticketTypeName: selectedType.name,
         unitPrice: selectedType.price,
         quantity: maxTicketsPerOrder,

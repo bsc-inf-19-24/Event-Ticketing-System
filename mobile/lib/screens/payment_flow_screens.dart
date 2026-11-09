@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 import '../features/orders/models/order.dart';
 import '../features/payment/logic/payment_controller.dart';
@@ -139,9 +141,11 @@ class _PayChanguCheckoutScreenState extends State<PayChanguCheckoutScreen> {
 
   Future<void> _openCheckout() async {
     final url = widget.controller.checkoutSession?.checkoutUrl;
-    if (url == null) {
+    final uri = Uri.tryParse(url ?? '');
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
       setState(
-        () => _error = 'The checkout link is missing. Restart checkout.',
+        () =>
+            _error = 'A secure checkout link is unavailable. Restart checkout.',
       );
       return;
     }
@@ -150,10 +154,16 @@ class _PayChanguCheckoutScreenState extends State<PayChanguCheckoutScreen> {
       _error = null;
     });
     try {
-      final opened = await launchUrl(
-        Uri.parse(url),
-        mode: LaunchMode.externalApplication,
-      );
+      if (!kIsWeb &&
+          (defaultTargetPlatform == TargetPlatform.android ||
+              defaultTargetPlatform == TargetPlatform.iOS)) {
+        await Navigator.push<void>(
+          context,
+          MaterialPageRoute(builder: (_) => _HostedCheckoutWebView(uri: uri)),
+        );
+        return;
+      }
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!opened) {
         throw const PaymentException('Could not open PayChangu checkout.');
       }
@@ -217,6 +227,51 @@ class _PayChanguCheckoutScreenState extends State<PayChanguCheckoutScreen> {
         ),
       ],
     ),
+  );
+}
+
+class _HostedCheckoutWebView extends StatefulWidget {
+  const _HostedCheckoutWebView({required this.uri});
+
+  final Uri uri;
+
+  @override
+  State<_HostedCheckoutWebView> createState() => _HostedCheckoutWebViewState();
+}
+
+class _HostedCheckoutWebViewState extends State<_HostedCheckoutWebView> {
+  late final WebViewController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onNavigationRequest: (request) {
+            final uri = Uri.tryParse(request.url);
+            return uri != null && uri.scheme == 'https'
+                ? NavigationDecision.navigate
+                : NavigationDecision.prevent;
+          },
+        ),
+      )
+      ..loadRequest(widget.uri);
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('Secure checkout'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Return to app'),
+        ),
+      ],
+    ),
+    body: WebViewWidget(controller: _controller),
   );
 }
 
