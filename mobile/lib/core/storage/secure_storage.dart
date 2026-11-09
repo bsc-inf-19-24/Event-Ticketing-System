@@ -15,11 +15,7 @@ class SecureStorageService {
     await _storage.write(key: _accessTokenKey, value: token);
   }
 
-  Future<void> deleteToken() async {
-    await _storage.delete(key: _accessTokenKey);
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.remove(_legacyTokenKey);
-  }
+  Future<void> deleteToken() => clearTokens();
 
   Future<String?> getToken() async {
     final token = await _storage.read(key: _accessTokenKey);
@@ -50,6 +46,4 @@ class SecureStorageService {
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(_legacyTokenKey);
   }
-
-  Future<void> deleteToken() => clearTokens();
 }

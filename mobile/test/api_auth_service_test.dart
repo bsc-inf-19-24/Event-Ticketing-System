@@ -174,4 +174,33 @@ void main() {
       ),
     );
   });
+
+  test('HTML 404 responses report a missing API endpoint', () async {
+    final client = ApiClient(
+      baseUrl: 'https://tickets.example',
+      client: MockClient(
+        (_) async => http.Response(
+          '<html>Not Found</html>',
+          404,
+          headers: {'content-type': 'text/html'},
+        ),
+      ),
+    );
+
+    await expectLater(
+      client.postUnauthenticated('/api/auth/login', {
+        'email': 'alex@example.com',
+        'password': 'password',
+      }),
+      throwsA(
+        isA<ApiException>()
+            .having((error) => error.statusCode, 'statusCode', 404)
+            .having(
+              (error) => error.message,
+              'message',
+              contains('API endpoint was not found'),
+            ),
+      ),
+    );
+  });
 }

@@ -35,7 +35,6 @@ class ApiClient {
 
   Future<dynamic> get(String endpoint, {String? token}) =>
       _send('GET', endpoint, null, authenticated: true, suppliedToken: token);
-      _send('GET', endpoint, null, authenticated: true, tokenOverride: token);
 
   Future<Uint8List> getBytes(
     String endpoint, {
@@ -64,7 +63,6 @@ class ApiClient {
     String? token,
   }) =>
       _send('POST', endpoint, body, authenticated: true, suppliedToken: token);
-      _send('POST', endpoint, body, authenticated: true, tokenOverride: token);
 
   Future<dynamic> postUnauthenticated(
     String endpoint, [
@@ -98,10 +96,6 @@ class ApiClient {
   }) async {
     final token = authenticated
         ? suppliedToken ?? await tokenProvider?.call()
-    String? tokenOverride,
-  }) async {
-    final token = authenticated
-        ? tokenOverride ?? await tokenProvider?.call()
         : null;
     var response = await _request(method, endpoint, body, token);
 
@@ -188,6 +182,12 @@ class ApiClient {
       try {
         responseData = jsonDecode(response.body);
       } on FormatException {
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          throw ApiException(
+            _messageForStatusCode(response.statusCode),
+            response.statusCode,
+          );
+        }
         throw ApiException(
           'The server returned an invalid response.',
           response.statusCode,
@@ -204,12 +204,13 @@ class ApiClient {
         : null;
     final message = serverMessage is String && serverMessage.trim().isNotEmpty
         ? serverMessage
-        : switch (response.statusCode) {
-            502 ||
-            503 ||
-            504 => 'The server is currently unavailable. Please retry.',
-            _ => 'Request failed (${response.statusCode}).',
-          };
+        : _messageForStatusCode(response.statusCode);
     throw ApiException(message, response.statusCode);
   }
+
+  String _messageForStatusCode(int statusCode) => switch (statusCode) {
+    404 => 'The API endpoint was not found (404). Check the backend route and server URL.',
+    502 || 503 || 504 => 'The server is currently unavailable. Please retry.',
+    _ => 'Request failed ($statusCode).',
+  };
 }

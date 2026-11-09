@@ -183,74 +183,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _showServerSettingsDialog() async {
-    final controller = TextEditingController(text: ApiConfig.baseUrl);
-    String? errorMessage;
-    await showDialog<void>(
+    final saved = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Server connection'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Enter the server base URL without an /api suffix.'),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                keyboardType: TextInputType.url,
-                decoration: InputDecoration(
-                  labelText: 'Server URL',
-                  hintText: 'https://example.com',
-                  errorText: errorMessage,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                try {
-                  await ApiConfig.resetBaseUrl();
-                  controller.text = ApiConfig.baseUrl;
-                  setDialogState(() => errorMessage = null);
-                } on Exception catch (error) {
-                  setDialogState(() => errorMessage = error.toString());
-                }
-              },
-              child: const Text('Use default'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                try {
-                  await ApiConfig.setBaseUrl(controller.text);
-                  if (dialogContext.mounted && mounted) {
-                    Navigator.of(dialogContext).pop();
-                    ScaffoldMessenger.of(this.context).showSnackBar(
-                      const SnackBar(content: Text('Server URL saved.')),
-                    );
-                  }
-                } on Exception catch (error) {
-                  setDialogState(
-                    () => errorMessage = error.toString().replaceFirst(
-                      'FormatException: ',
-                      '',
-                    ),
-                  );
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      ),
+      builder: (_) => _ServerConnectionDialog(initialUrl: ApiConfig.baseUrl),
     );
-    controller.dispose();
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    if (saved == true) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Server URL saved.')));
+    }
   }
 
   // Section Header Helper
@@ -404,4 +346,88 @@ class _SettingsScreenState extends State<SettingsScreen> {
       },
     );
   }
+}
+
+class _ServerConnectionDialog extends StatefulWidget {
+  const _ServerConnectionDialog({required this.initialUrl});
+
+  final String initialUrl;
+
+  @override
+  State<_ServerConnectionDialog> createState() =>
+      _ServerConnectionDialogState();
+}
+
+class _ServerConnectionDialogState extends State<_ServerConnectionDialog> {
+  late final TextEditingController _controller;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialUrl);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _resetToDefault() async {
+    try {
+      await ApiConfig.resetBaseUrl();
+      if (!mounted) return;
+      _controller.text = ApiConfig.baseUrl;
+      setState(() => _errorMessage = null);
+    } on Exception catch (error) {
+      if (mounted) setState(() => _errorMessage = error.toString());
+    }
+  }
+
+  Future<void> _save() async {
+    try {
+      await ApiConfig.setBaseUrl(_controller.text);
+      if (mounted) Navigator.of(context).pop(true);
+    } on Exception catch (error) {
+      if (mounted) {
+        setState(
+          () => _errorMessage = error.toString().replaceFirst(
+            'FormatException: ',
+            '',
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Server connection'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Enter the server base URL without an /api suffix.'),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controller,
+          keyboardType: TextInputType.url,
+          decoration: InputDecoration(
+            labelText: 'Server URL',
+            hintText: 'https://example.com',
+            errorText: _errorMessage,
+          ),
+        ),
+      ],
+    ),
+    actions: [
+      TextButton(onPressed: _resetToDefault, child: const Text('Use default')),
+      TextButton(
+        onPressed: () => Navigator.of(context).pop(false),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(onPressed: _save, child: const Text('Save')),
+    ],
+  );
 }

@@ -22,14 +22,13 @@ void main() {
         'ticket_storage_test_${DateTime.now().microsecondsSinceEpoch}.db';
     final ticket = Ticket(
       id: 'ticket-1',
-      userId: 'local-user',
+      userId: 'test-user',
       eventName: 'Local concert',
       date: '5 Dec 2026, 3:00 PM',
       venue: 'City Hall',
       status: 'Confirmed',
       qrData: 'qr-ticket-1',
       price: 2500,
-      userId: 'test-user',
     );
     final storage = TicketStorage(databaseName: databaseName);
 
@@ -50,7 +49,6 @@ void main() {
         status: ticket.status,
         qrData: ticket.qrData,
         price: ticket.price,
-        userId: 'test-user',
       ),
     );
     expect((await storage.getSavedTickets()), hasLength(1));
@@ -61,7 +59,6 @@ void main() {
     expect((await reopenedStorage.getTicket(ticket.id))!.qrData, ticket.qrData);
 
     final offlineTickets = await TicketRepository(storage: reopenedStorage)
-        .load(userId: 'test-user', hasConnection: false);
         .load(userId: ticket.userId, hasConnection: false);
     expect(offlineTickets.isOffline, isTrue);
     expect(offlineTickets.savedIds, contains(ticket.id));
@@ -77,7 +74,6 @@ void main() {
         status: 'Used',
         qrData: ticket.qrData,
         price: 3000,
-        userId: 'test-user',
       ),
     );
     final updated = (await reopenedStorage.getTicket(ticket.id))!;

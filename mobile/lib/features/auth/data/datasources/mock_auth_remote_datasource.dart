@@ -4,9 +4,6 @@ import '../../models/app_user.dart';
 import '../../services/auth_service.dart';
 import '../../services/fake_auth_service.dart';
 import '../model/user_model.dart';
-import '../model/user_model.dart';
-import '../../services/auth_service.dart';
-import '../../services/fake_auth_service.dart';
 import 'auth_remote_datasource.dart';
 
 class MockAuthRemoteDataSource implements AuthRemoteDataSource {
@@ -46,22 +43,15 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
   @override
   Future<UserModel> login(String email, String password) async {
     try {
-      return _currentUser = _asModel(
-        await _authService.logIn(email: email, password: password),
-      );
+      final user = await _authService.logIn(email: email, password: password);
+      return _currentUser = _asModel(user);
     } on AuthException catch (error) {
       throw ApiException(error.message, 401);
-      return _currentUser!;
-    } on AuthException {
-      throw const ApiException(
-        'Invalid email or password. Please try again.',
-        401,
-      );
     }
   }
 
   @override
-  Future<UserModel> loginWithGoogle(String idToken) => Future<UserModel>.error(
+  Future<UserModel> loginWithGoogle(String idToken) => Future.error(
     const ApiException('Google sign-in is unavailable in demo mode.', 501),
   );
 
@@ -69,14 +59,6 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
   Future<UserModel> getCurrentProfile() async {
     final current = _currentUser;
     if (current == null) {
-  Future<UserModel> loginWithGoogle(String idToken) async {
-    throw const ApiException('Google sign-in is unavailable in demo mode.');
-  }
-
-  @override
-  Future<UserModel> getCurrentProfile() async {
-    final user = _currentUser;
-    if (user == null) {
       throw const ApiException('No signed-in demo user is available.', 401);
     }
     return current;
