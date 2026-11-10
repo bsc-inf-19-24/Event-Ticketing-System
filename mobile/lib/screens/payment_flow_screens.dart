@@ -215,8 +215,18 @@ class _PayChanguCheckoutScreenState extends State<PayChanguCheckoutScreen> {
           Text(_error!, style: const TextStyle(color: Colors.redAccent)),
         ],
         const SizedBox(height: 12),
+        if (widget.controller.isPendingVerification) ...[
+          const SizedBox(height: 8),
+          const Text(
+            'Your order is pending. No ticket is issued until the backend confirms payment.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.orangeAccent),
+          ),
+        ],
         _actionButton(
-          label: 'I completed payment — verify',
+          label: widget.controller.isPendingVerification
+              ? 'Recheck payment status'
+              : 'I completed payment — verify',
           secondary: true,
           onPressed: () => _showVerifying(
             context,

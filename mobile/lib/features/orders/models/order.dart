@@ -19,6 +19,11 @@ class OrderItem {
     'quantity': quantity,
   };
 
+  Map<String, dynamic> toOrderRequestJson() => {
+    if (ticketTypeId != null) 'ticketTypeId': int.tryParse(ticketTypeId!) ?? ticketTypeId,
+    'quantity': quantity,
+  };
+
   factory OrderItem.fromJson(Map<String, dynamic> json) => OrderItem(
     ticketTypeId: _nullableString(json['ticketTypeId']),
     ticketTypeName: _stringValue(json['ticketTypeName'], fallback: 'Standard'),
@@ -105,7 +110,7 @@ class Order {
       eventVenue: _stringValue(json['eventVenue']),
       eventDate: _stringValue(json['eventDate']),
       items: items,
-      total: json['total'] is num ? (json['total'] as num).toInt() : 0,
+      total: _intValue(json['totalAmount'] ?? json['total_amount'] ?? json['total']),
       status: const {'pending', 'paid', 'failed', 'cancelled'}.contains(status)
           ? status
           : 'pending',
@@ -118,8 +123,14 @@ class Order {
   }
 }
 
+int _intValue(dynamic value) {
+  if (value is num) return value.toInt();
+  final parsed = num.tryParse('$value');
+  return parsed?.toInt() ?? 0;
+}
+
 String _stringValue(dynamic value, {String fallback = ''}) =>
-    value is String ? value : fallback;
+    value is String ? value : value is num ? value.toString() : fallback;
 
 String? _nullableString(dynamic value) =>
     value is String && value.trim().isNotEmpty ? value.trim() : null;

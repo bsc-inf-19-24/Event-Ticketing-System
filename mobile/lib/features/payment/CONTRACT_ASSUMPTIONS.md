@@ -24,8 +24,7 @@ The implementation currently assumes:
 No client-side payment result is treated as proof of payment. Production tickets
 are shown only when the authenticated server reports a paid/confirmed order.
 
-The app's current event catalog is static sample data and has no event API
-adapter or server IDs. Real checkout rejects these entries instead of creating
-orders with guessed IDs. Connecting the real catalog requires the backend event
-list/detail route and response schema; set `USE_FAKE_EVENTS=false` to hide the
-sample catalog until that integration is available.
+The app loads its event catalog from the backend event list/detail routes and
+never displays static sample events. When the server returns an empty event list,
+the home screen displays “No available events.” Real checkout rejects any event
+without server event and ticket-type IDs instead of creating orders with guessed IDs.

@@ -10,6 +10,34 @@ class EventCard extends StatelessWidget {
 
   const EventCard({super.key, required this.event, this.onTap});
 
+  Widget _eventImage(double width) {
+    final uri = Uri.tryParse(event.imagePath);
+    final remote =
+        uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
+    final fallback = Container(
+      width: width,
+      height: 200,
+      color: AppColors.surface,
+      child: const Icon(Icons.event, color: Colors.white54, size: 44),
+    );
+    if (event.imagePath.isEmpty) return fallback;
+    return remote
+        ? Image.network(
+            event.imagePath,
+            width: width,
+            height: 200,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => fallback,
+          )
+        : Image.asset(
+            event.imagePath,
+            width: width,
+            height: 200,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => fallback,
+          );
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -31,12 +59,7 @@ class EventCard extends StatelessWidget {
                   borderRadius: const BorderRadius.horizontal(
                     left: Radius.circular(16),
                   ),
-                  child: Image.asset(
-                    event.imagePath,
-                    width: imageWidth,
-                    height: 200,
-                    fit: BoxFit.cover,
-                  ),
+                  child: _eventImage(imageWidth),
                 ),
                 Expanded(
                   child: Padding(

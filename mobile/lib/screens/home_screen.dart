@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../features/auth/logic/auth_controller.dart';
 import '../features/tickets/logic/tickets_controller.dart';
-import '../features/payment/services/fake_payment_service.dart';
+import '../features/events/event_api.dart';
+import '../core/api_client.dart';
 import 'event_details_screen.dart';
-import '../data/sample_events.dart';
 import '../models/event.dart';
 import '../theme/app_colors.dart';
 import '../widgets/event_card.dart';
@@ -15,7 +15,14 @@ class HomeScreen extends StatefulWidget {
   final String? customerName;
   final VoidCallback onViewTickets;
 
-  const HomeScreen({super.key, this.customerName, required this.onViewTickets});
+  const HomeScreen({
+    super.key,
+    this.customerName,
+    this.eventApi,
+    required this.onViewTickets,
+  });
+
+  final EventApi? eventApi;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -25,26 +32,46 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<String> categories = ['For you', 'Sports', 'Concerts', 'Workshop'];
   String selectedCategory = 'For you';
   String searchQuery = '';
+  late final EventApi _eventApi = widget.eventApi ?? EventApi();
+  List<Event> _remoteEvents = const [];
+  bool _loadingEvents = false;
+  String? _eventsError;
+  int _requestGeneration = 0;
 
-  // Events to show, based on the selected chip
-  List<Event> get filteredEvents {
-    if (!useFakeEvents) return const [];
-    final query = searchQuery.trim().toLowerCase();
-    return sampleEvents.where((event) {
-      final matchesCategory =
-          selectedCategory == 'For you' || event.category == selectedCategory;
-      final matchesQuery =
-          query.isEmpty ||
-          [
-            event.title,
-            event.category,
-            event.genre,
-            event.venue,
-            event.date,
-          ].any((value) => value.toLowerCase().contains(query));
-      return matchesCategory && matchesQuery;
-    }).toList();
+  @override
+  void initState() {
+    super.initState();
+    _loadEvents();
   }
+
+  Future<void> _loadEvents() async {
+    final generation = ++_requestGeneration;
+    setState(() {
+      _loadingEvents = true;
+      _eventsError = null;
+    });
+    try {
+      final events = await _eventApi.list(
+        category: selectedCategory == 'For you' ? null : selectedCategory,
+        search: searchQuery,
+      );
+      if (!mounted || generation != _requestGeneration) return;
+      setState(() => _remoteEvents = events);
+    } catch (error) {
+      if (!mounted || generation != _requestGeneration) return;
+      setState(
+        () => _eventsError = error is ApiException
+            ? error.message
+            : 'Could not load events. Please try again.',
+      );
+    } finally {
+      if (mounted && generation == _requestGeneration) {
+        setState(() => _loadingEvents = false);
+      }
+    }
+  }
+
+  List<Event> get filteredEvents => _remoteEvents;
 
   @override
   Widget build(BuildContext context) {
@@ -85,17 +112,38 @@ class _HomeScreenState extends State<HomeScreen> {
                 categoryChips: _buildCategoryChips(),
               ),
             ),
-            if (events.isEmpty)
+            if (_loadingEvents)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_eventsError != null)
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(
-                  child: Text(
-                    !useFakeEvents
-                        ? 'The real event catalog is not connected yet'
-                        : searchQuery.trim().isNotEmpty
-                        ? 'No events found'
-                        : 'No events in this category yet',
-                    style: const TextStyle(color: Colors.white70),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _eventsError!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                      TextButton(
+                        onPressed: _loadEvents,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else if (events.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: const Text(
+                    'No available events',
+                    style: TextStyle(color: Colors.white70),
                   ),
                 ),
               )
@@ -111,7 +159,27 @@ class _HomeScreenState extends State<HomeScreen> {
                     final event = events[index ~/ 2];
                     return EventCard(
                       event: event,
-                      onTap: () {
+                      onTap: () async {
+                        var selectedEvent = event;
+                        final eventId = event.id;
+                        if (eventId != null &&
+                            eventId.isNotEmpty &&
+                            event.ticketTypes.isEmpty) {
+                          try {
+                            selectedEvent = await _eventApi.details(eventId);
+                          } catch (error) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  error is ApiException ? error.message : 'Could not load ticket types. Please retry.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                        }
+                        if (!context.mounted) return;
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -119,7 +187,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               name: EventDetailsScreen.routeName,
                             ),
                             builder: (context) =>
-                                EventDetailsScreen(event: event),
+                                EventDetailsScreen(event: selectedEvent),
                           ),
                         );
                       },
@@ -203,6 +271,7 @@ class _HomeScreenState extends State<HomeScreen> {
           setState(() {
             searchQuery = value;
           });
+          _loadEvents();
         },
         decoration: InputDecoration(
           hintText: 'Search',
@@ -245,6 +314,7 @@ class _HomeScreenState extends State<HomeScreen> {
               setState(() {
                 selectedCategory = category;
               });
+              _loadEvents();
             },
           );
         },

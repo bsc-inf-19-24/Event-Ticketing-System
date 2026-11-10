@@ -1,5 +1,6 @@
 import '../../../core/api_client.dart';
 import '../../../core/api_endpoints.dart';
+import '../../orders/models/order.dart';
 import '../models/payment_models.dart';
 import 'payment_service.dart';
 
@@ -12,13 +13,15 @@ class ApiPaymentService implements PaymentService {
 
   Future<Map<String, dynamic>> createOrder({
     required String eventId,
-    required String ticketTypeId,
-    required int quantity,
+    required List<OrderItem> items,
     required String idempotencyKey,
   }) async {
     final response = await _apiClient.post(
       ApiEndpoints.orders,
-      {'eventId': eventId, 'ticketTypeId': ticketTypeId, 'quantity': quantity},
+      {
+        'eventId': _numericOrString(eventId),
+        'items': items.map((item) => item.toOrderRequestJson()).toList(),
+      },
       headers: {'Idempotency-Key': idempotencyKey},
     );
     return _objectResponse(response, 'order');
@@ -29,9 +32,8 @@ class ApiPaymentService implements PaymentService {
     required PaymentMethod method,
     required String phone,
   }) async {
-    final response = await _apiClient.post(ApiEndpoints.orderPayment(orderId), {
-      'method': method.name,
-      if (phone.isNotEmpty) 'phoneNumber': phone,
+    final response = await _apiClient.post(ApiEndpoints.paymentCheckout, {
+      'orderId': _numericOrString(orderId),
     });
     final data = _objectResponse(response, 'payment');
     final checkoutUrl = _firstString([
@@ -57,19 +59,42 @@ class ApiPaymentService implements PaymentService {
       );
     }
     return CheckoutSession(
-      txRef: txRef.isEmpty ? orderId : txRef,
+      txRef: txRef,
       checkoutUrl: uri.toString(),
       currency: _firstString([data['currency']], fallback: 'MWK'),
-      amount: _intValue([data['amount'], data['total'], data['totalAmount']]),
+      amount: _intValue([data['amount']]),
       mode: _firstString([data['mode']], fallback: 'live'),
       status: _firstString([data['status']], fallback: 'pending'),
     );
+  }
+
+  Future<Map<String, dynamic>> verifyOrder(String orderId) async {
+    final response = await _apiClient.post(ApiEndpoints.paymentVerify, {
+      'orderId': _numericOrString(orderId),
+    });
+    if (response is! Map) {
+      throw const ApiException('The server returned invalid payment verification data.');
+    }
+    final outer = Map<String, dynamic>.from(response);
+    final data = outer['data'];
+    return data is Map ? Map<String, dynamic>.from(data) : outer;
   }
 
   Future<Map<String, dynamic>> getOrder(String orderId) async {
     final response = await _apiClient.get(
       '${ApiEndpoints.orders}/${Uri.encodeComponent(orderId)}',
     );
+    return _objectResponse(response, 'order');
+  }
+
+  Future<List<Map<String, dynamic>>> getOrderTickets(String orderId) async {
+    final response = await _apiClient.get(ApiEndpoints.orderTickets(Uri.encodeComponent(orderId)));
+    final values = _listResponse(response, 'tickets');
+    return values.map((value) => Map<String, dynamic>.from(value as Map)).toList();
+  }
+
+  Future<Map<String, dynamic>> cancelOrder(String orderId) async {
+    final response = await _apiClient.post(ApiEndpoints.cancelOrder(Uri.encodeComponent(orderId)), const {});
     return _objectResponse(response, 'order');
   }
 
@@ -141,6 +166,18 @@ Map<String, dynamic> _objectResponse(dynamic response, String name) {
     value = Map<String, dynamic>.from(nested);
   }
   return value;
+}
+
+dynamic _numericOrString(String value) => int.tryParse(value) ?? value;
+
+List<dynamic> _listResponse(dynamic response, String name) {
+  dynamic value = response;
+  for (var depth = 0; depth < 3 && value is Map; depth++) {
+    final map = Map<String, dynamic>.from(value);
+    value = map['data'] ?? map[name] ?? map['items'];
+  }
+  if (value is List) return value;
+  throw ApiException('The server returned invalid $name data.');
 }
 
 Map<String, dynamic> _nested(dynamic value) =>

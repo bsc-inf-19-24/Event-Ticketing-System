@@ -27,6 +27,7 @@ class ApiClient {
   final http.Client _client;
 
   String get _effectiveBaseUrl => baseUrl ?? ApiConfig.baseUrl;
+  String get effectiveBaseUrl => _effectiveBaseUrl;
 
   Future<String?> Function()? tokenProvider;
   Future<String?> Function()? tokenRefresher;

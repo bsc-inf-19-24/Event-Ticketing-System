@@ -20,6 +20,7 @@ class TicketSelectionScreen extends StatefulWidget {
 class _TicketSelectionScreenState extends State<TicketSelectionScreen> {
   late final List<TicketType> _types;
   int? _selectedIndex;
+  int _quantity = 1;
 
   @override
   void initState() {
@@ -27,10 +28,17 @@ class _TicketSelectionScreenState extends State<TicketSelectionScreen> {
     _types = widget.event.ticketTypes.isEmpty
         ? [TicketType(name: 'Standard', price: widget.event.price)]
         : widget.event.ticketTypes;
-    if (_types.length == 1) _selectedIndex = 0;
+    if (_types.length == 1 && _types.single.isAvailable) _selectedIndex = 0;
   }
 
-  int get _total => _selectedIndex == null ? 0 : _types[_selectedIndex!].price;
+  int get _total => _selectedIndex == null
+      ? 0
+      : _types[_selectedIndex!].price * _quantity;
+
+  int get _quantityLimit => _selectedIndex == null
+      ? 0
+      : (_types[_selectedIndex!].remainingInventory ?? maxTicketsPerOrder)
+            .clamp(0, maxTicketsPerOrder);
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -59,11 +67,32 @@ class _TicketSelectionScreenState extends State<TicketSelectionScreen> {
                 const SizedBox(height: 16),
                 RadioGroup<int>(
                   groupValue: _selectedIndex,
-                  onChanged: (value) => setState(() => _selectedIndex = value),
+                  onChanged: (value) => setState(() {
+                    _selectedIndex = value;
+                    _quantity = 1;
+                  }),
                   child: Column(
                     children: [
                       for (var index = 0; index < _types.length; index++)
                         _ticketTypeCard(index),
+                      if (_selectedIndex != null) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Expanded(child: Text('Quantity', style: TextStyle(color: Colors.white))),
+                            IconButton(
+                              onPressed: _quantity > 1 ? () => setState(() => _quantity--) : null,
+                              icon: const Icon(Icons.remove_circle_outline, color: Colors.white),
+                            ),
+                            Text('$_quantity', style: const TextStyle(color: Colors.white, fontSize: 18)),
+                            IconButton(
+                              onPressed: _quantity < _quantityLimit ? () => setState(() => _quantity++) : null,
+                              icon: const Icon(Icons.add_circle_outline, color: Colors.white),
+                            ),
+                          ],
+                        ),
+                        Text('Maximum 10 tickets per order', style: TextStyle(color: Colors.white70)),
+                      ],
                     ],
                   ),
                 ),
@@ -97,7 +126,7 @@ class _TicketSelectionScreenState extends State<TicketSelectionScreen> {
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: _selectedIndex == null ? null : _continue,
+                    onPressed: _selectedIndex == null || _quantityLimit < 1 ? null : _continue,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.button,
                       foregroundColor: Colors.white,
@@ -124,11 +153,12 @@ class _TicketSelectionScreenState extends State<TicketSelectionScreen> {
       ),
       child: RadioListTile<int>(
         value: index,
+        enabled: type.isAvailable,
         activeColor: AppColors.accent,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         title: Text(type.name, style: const TextStyle(color: Colors.white)),
         subtitle: Text(
-          'MWK ${formatPrice(type.price)}',
+          'MWK ${formatPrice(type.price)}${type.remainingInventory == null ? '' : ' · ${type.remainingInventory} left'}${type.isAvailable ? '' : ' · Sold out'}',
           style: const TextStyle(color: Colors.white70),
         ),
       ),
@@ -139,12 +169,13 @@ class _TicketSelectionScreenState extends State<TicketSelectionScreen> {
     final selectedIndex = _selectedIndex;
     if (selectedIndex == null) return;
     final selectedType = _types[selectedIndex];
+    if (!selectedType.isAvailable || _quantity > _quantityLimit) return;
     final items = [
       OrderItem(
         ticketTypeId: selectedType.id,
         ticketTypeName: selectedType.name,
         unitPrice: selectedType.price,
-        quantity: maxTicketsPerOrder,
+        quantity: _quantity,
       ),
     ];
     Navigator.push(

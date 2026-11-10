@@ -8,7 +8,6 @@
       "program": "lib/main.dart",
       "args": [
         "--dart-define=USE_FAKE_AUTH=true",
-        "--dart-define=USE_FAKE_EVENTS=true",
         "--dart-define=USE_FAKE_PAYMENT=true",
         "--dart-define=USE_FAKE_TICKETS=true"
       ]
@@ -21,7 +20,6 @@
       "args": [
         "--dart-define=API_BASE_URL=http://localhost:8080",
         "--dart-define=USE_FAKE_AUTH=false",
-        "--dart-define=USE_FAKE_EVENTS=false",
         "--dart-define=USE_FAKE_PAYMENT=false",
         "--dart-define=USE_FAKE_TICKETS=false",
         "--dart-define=ASSUME_PAYMENT_SUCCESS=false",
@@ -36,7 +34,6 @@
       "args": [
         "--dart-define=API_BASE_URL=http://10.0.2.2:8080",
         "--dart-define=USE_FAKE_AUTH=false",
-        "--dart-define=USE_FAKE_EVENTS=false",
         "--dart-define=USE_FAKE_PAYMENT=false",
         "--dart-define=USE_FAKE_TICKETS=false",
         "--dart-define=ASSUME_PAYMENT_SUCCESS=false",

@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api_client.dart';
 import '../../../features/auth/logic/auth_controller.dart';
@@ -44,6 +45,12 @@ class PaymentController extends ChangeNotifier {
   String _buyerEmail = '';
   String? _pendingIdempotencyKey;
   String? _pendingOrderFingerprint;
+  bool _beginInFlight = false;
+  bool _pendingVerification = false;
+  bool get isPendingVerification => _pendingVerification;
+  static const pendingOrderPreference = 'pending_payment_order_id';
+  String? _paymentState;
+  String? get paymentState => _paymentState;
 
   /// Creates an order and starts the selected test or backend payment flow.
   Future<void> begin({
@@ -53,9 +60,10 @@ class PaymentController extends ChangeNotifier {
     required PaymentMethod method,
     required String phone,
   }) async {
+    if (_beginInFlight || isProcessing) return;
     if (!hasValidTicketSelection(items)) {
       throw const PaymentException(
-        'Choose exactly one ticket type and one ticket to continue.',
+        'Choose between 1 and 10 tickets, without duplicate ticket types.',
       );
     }
     final user = _auth.user;
@@ -63,8 +71,11 @@ class PaymentController extends ChangeNotifier {
       throw const PaymentException('Please log in to continue.');
     }
 
+    _beginInFlight = true;
     isProcessing = true;
     failureReason = null;
+    _pendingVerification = false;
+    _paymentState = null;
     checkoutSession = null;
     purchasedTickets = const [];
     _buyerName = user.name;
@@ -129,6 +140,7 @@ class PaymentController extends ChangeNotifier {
       }
       rethrow;
     } finally {
+      _beginInFlight = false;
       isProcessing = false;
       notifyListeners();
     }
@@ -163,8 +175,7 @@ class PaymentController extends ChangeNotifier {
     }
     final response = await service.createOrder(
       eventId: eventId,
-      ticketTypeId: ticketTypeId,
-      quantity: item.quantity,
+      items: [item],
       idempotencyKey: _pendingIdempotencyKey!,
     );
     final orderId = _firstString([
@@ -173,10 +184,9 @@ class PaymentController extends ChangeNotifier {
       response['order_id'],
     ]);
     final serverTotal = _integer([
-      response['total'],
       response['totalAmount'],
       response['total_amount'],
-      response['amount'],
+      response['total'],
     ]);
     if (orderId.isEmpty || serverTotal <= 0) {
       throw const PaymentException(
@@ -199,6 +209,8 @@ class PaymentController extends ChangeNotifier {
       createdAt: now,
     );
     order = createdOrder;
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(pendingOrderPreference, orderId);
     await _orderRepository.saveOrder(createdOrder);
 
     final session = await service.initiateOrderPayment(
@@ -206,12 +218,20 @@ class PaymentController extends ChangeNotifier {
       method: method,
       phone: phone,
     );
+    if (session.amount > 0 && session.amount != serverTotal) {
+      throw const PaymentException(
+        'The checkout amount does not match the server order amount.',
+      );
+    }
     checkoutSession = session;
     order = createdOrder.copyWith(txRef: session.txRef);
     await _orderRepository.saveOrder(order!);
   }
 
   /// Completes a payment only after the configured service confirms it.
+  Future<bool> verifyPendingOrder(Event event) =>
+      finish(event, PaymentOutcome.success);
+
   Future<bool> finish(
     Event event,
     PaymentOutcome outcome, {
@@ -222,17 +242,20 @@ class PaymentController extends ChangeNotifier {
       failureReason = 'The order could not be found.';
       return false;
     }
+    if (_paymentService is ApiPaymentService && outcome == PaymentOutcome.cancelled) {
+      failureReason = 'Payment is still pending. Verify it when you return.';
+      _pendingVerification = true;
+      _paymentState = 'pending';
+      notifyListeners();
+      return false;
+    }
     isProcessing = true;
     failureReason = null;
     notifyListeners();
     try {
       final service = _paymentService;
       if (service is ApiPaymentService) {
-        final success = await _finishServerOrder(
-          service,
-          currentOrder,
-          outcome,
-        );
+        final success = await _finishServerOrder(service, currentOrder);
         if (success) _clearIdempotencyState();
         return success;
       }
@@ -300,41 +323,25 @@ class PaymentController extends ChangeNotifier {
   Future<bool> _finishServerOrder(
     ApiPaymentService service,
     Order currentOrder,
-    PaymentOutcome outcome,
   ) async {
-    if (outcome == PaymentOutcome.cancelled) {
-      failureReason = 'Payment was cancelled.';
-      return false;
-    }
-
-    if (assumePaymentSuccess) {
-      try {
-        await service.confirmDemoPayment(currentOrder.id);
-      } on ApiException catch (error) {
-        if (!allowLocalTicketFallback ||
-            (error.statusCode != 404 && error.statusCode != 403)) {
-          rethrow;
-        }
-        purchasedTickets = await _createLocalFallback(currentOrder);
-        return purchasedTickets.isNotEmpty;
-      }
-    }
-
-    for (var attempt = 0; attempt < 10; attempt++) {
-      final remoteOrder = await service.getOrder(currentOrder.id);
-      final status = _firstString([
-        remoteOrder['status'],
-        remoteOrder['paymentStatus'],
-        remoteOrder['payment_status'],
-      ]).toLowerCase();
-      if (const {
-        'paid',
-        'success',
-        'successful',
-        'completed',
-        'confirmed',
-        'settled',
-      }.contains(status)) {
+    final verification = await service.verifyOrder(currentOrder.id);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.remove(pendingOrderPreference);
+    final remoteOrder = _nestedMap(verification['order']);
+    final payment = _nestedMap(verification['payment']);
+    final status = _firstString([
+      remoteOrder['status'],
+      verification['orderStatus'],
+      verification['order_status'],
+      verification['status'],
+    ]).toUpperCase();
+    final paymentStatus = _firstString([
+      verification['paymentStatus'],
+      verification['payment_status'],
+      payment['status'],
+      verification['status'],
+    ]).toUpperCase();
+      if (status == 'PAID' && paymentStatus == 'PAID') {
         purchasedTickets = await _readIssuedTickets(
           service,
           remoteOrder,
@@ -347,23 +354,17 @@ class PaymentController extends ChangeNotifier {
         }
         return true;
       }
-      if (const {
-        'failed',
-        'cancelled',
-        'canceled',
-        'rejected',
-      }.contains(status)) {
+      if (status == 'FAILED' || paymentStatus == 'FAILED') {
+        _paymentState = 'failed';
+        _pendingVerification = false;
         failureReason = 'The server could not confirm this payment.';
         return false;
       }
-      if (attempt < 9) {
-        await Future<void>.delayed(const Duration(seconds: 6));
-      }
-    }
-
-    failureReason =
-        'Payment is still pending. Check your tickets again shortly.';
-    return false;
+      _paymentState = 'pending';
+      _pendingVerification = true;
+      await preferences.setString(pendingOrderPreference, currentOrder.id);
+      failureReason = 'Payment is still pending. Recheck when ready.';
+      return false;
   }
 
   Future<List<Ticket>> _readIssuedTickets(
@@ -372,20 +373,7 @@ class PaymentController extends ChangeNotifier {
     Order currentOrder,
   ) async {
     var values = _ticketValues(orderResponse);
-    if (values.isEmpty) {
-      final orders = await service.getMyOrders();
-      for (final remote in orders) {
-        if (_firstString([
-              remote['id'],
-              remote['orderId'],
-              remote['order_id'],
-            ]) ==
-            currentOrder.id) {
-          values = _ticketValues(remote);
-          break;
-        }
-      }
-    }
+    if (values.isEmpty) values = await service.getOrderTickets(currentOrder.id);
     final userId = _auth.stableUserId!;
     final tickets = <Ticket>[];
     for (final value in values) {
@@ -398,28 +386,13 @@ class PaymentController extends ChangeNotifier {
           'The server returned a ticket belonging to another account.',
         );
       }
-      if (ticket.isIssued) tickets.add(ticket);
+      if (ticket.isIssued && ticket.qrPayload.isNotEmpty) tickets.add(ticket);
     }
     if (tickets.isNotEmpty) await _ticketsController.addTickets(tickets);
     return tickets;
   }
 
-  Future<List<Ticket>> _createLocalFallback(Order currentOrder) =>
-      _orderRepository.completePaidOrder(
-        order: currentOrder.copyWith(status: 'paid'),
-        event: Event(
-          title: currentOrder.eventTitle,
-          date: currentOrder.eventDate,
-          time: '',
-          venue: currentOrder.eventVenue,
-          price: currentOrder.total,
-          imagePath: '',
-          category: '',
-        ),
-        ticketsController: _ticketsController,
-        buyerName: _buyerName,
-        buyerEmail: _buyerEmail,
-      );
+
 
   List<Map<String, dynamic>> _ticketValues(Map<String, dynamic> orderData) {
     final values = orderData['tickets'] ?? orderData['ticket'];
@@ -433,6 +406,9 @@ class PaymentController extends ChangeNotifier {
     }
     return const [];
   }
+
+  Map<String, dynamic> _nestedMap(dynamic value) =>
+      value is Map ? Map<String, dynamic>.from(value) : const {};
 
   List<OrderItem> _parseOrderItems(dynamic value) {
     if (value is! List) return const [];
@@ -464,6 +440,9 @@ class PaymentController extends ChangeNotifier {
   void _clearIdempotencyState() {
     _pendingIdempotencyKey = null;
     _pendingOrderFingerprint = null;
+    _pendingVerification = false;
+    _paymentState = 'paid';
+    SharedPreferences.getInstance().then((preferences) => preferences.remove(pendingOrderPreference));
   }
 
   Future<void> _updateOrderStatus(

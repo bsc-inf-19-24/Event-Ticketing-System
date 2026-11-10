@@ -165,7 +165,7 @@ void main() {
         ),
       ]);
       final created = duplicateAttempts.expand((attempt) => attempt).toList();
-      expect(created, hasLength(1));
+      expect(created, hasLength(order.items.single.quantity));
       expect(
         duplicateAttempts.where((attempt) => attempt.isEmpty),
         hasLength(1),
@@ -244,9 +244,13 @@ void main() {
       controller.begin(
         event: _event(),
         items: const [
-          OrderItem(ticketTypeName: 'Standard', unitPrice: 50, quantity: 2),
+          OrderItem(
+            ticketTypeName: 'Standard',
+            unitPrice: 50,
+            quantity: maxTicketsPerOrder + 1,
+          ),
         ],
-        total: 100,
+        total: 550,
         method: PaymentMethod.card,
         phone: '',
       ),
@@ -291,7 +295,7 @@ void main() {
           OrderItem(
             ticketTypeName: 'Standard',
             unitPrice: 50,
-            quantity: maxTicketsPerOrder,
+            quantity: 1,
           ),
         ],
         total: 50,
@@ -407,7 +411,7 @@ Order _order({String id = 'ORD-test', String txRef = 'TM-test'}) => Order(
     OrderItem(
       ticketTypeName: 'Standard',
       unitPrice: 50,
-      quantity: maxTicketsPerOrder,
+      quantity: 1,
     ),
   ],
   total: 50,
