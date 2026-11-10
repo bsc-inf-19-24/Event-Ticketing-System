@@ -4,6 +4,7 @@ import '../features/orders/models/order.dart';
 import '../features/payment/logic/payment_controller.dart';
 import '../features/payment/models/payment_models.dart';
 import '../features/payment/services/payment_service.dart';
+import '../features/payment/services/api_payment_service.dart';
 import '../features/payment/services/fake_payment_service.dart';
 import '../models/event.dart';
 import '../theme/app_colors.dart';
@@ -28,7 +29,9 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
-  final _paymentController = PaymentController();
+  final _paymentController = PaymentController(
+    paymentService: ApiPaymentService(),
+  );
   static const _method = PaymentMethod.card;
   bool _processing = false;
   bool _cancelRequested = false;
@@ -119,7 +122,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           Text('Payment', style: _title),
                           SizedBox(height: 8),
                           Text(
-                            'You will enter your payment details securely on PayChangu.',
+                            useFakePayments
+                                ? 'The student demo payment page will open in your browser. No real payment is made.'
+                                : 'You will enter your payment details securely on PayChangu.',
                             style: _muted,
                           ),
                         ],
@@ -217,15 +222,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final cancelPrompt = _cancelPrompt;
       if (cancelPrompt != null) await cancelPrompt;
       if (!mounted || _cancelRequested) return;
-      final page = useFakePayments
-          ? FakeHostedCheckoutScreen(
-              event: widget.event,
-              controller: _paymentController,
-            )
-          : PayChanguCheckoutScreen(
-              event: widget.event,
-              controller: _paymentController,
-            );
+      final page = PayChanguCheckoutScreen(
+        event: widget.event,
+        controller: _paymentController,
+      );
       Navigator.push(context, MaterialPageRoute(builder: (_) => page));
     } catch (error) {
       if (mounted && !_cancelRequested) {

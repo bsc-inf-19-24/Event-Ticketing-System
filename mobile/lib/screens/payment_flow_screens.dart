@@ -1,14 +1,13 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 
 import '../features/orders/models/order.dart';
 import '../features/payment/logic/payment_controller.dart';
 import '../features/payment/models/payment_models.dart';
 import '../features/payment/services/payment_service.dart';
+import '../features/payment/services/fake_payment_service.dart';
 import '../features/tickets/logic/tickets_controller.dart';
 import '../models/event.dart';
 import '../theme/app_colors.dart';
@@ -36,90 +35,7 @@ void _showVerifying(
   );
 }
 
-/// Local hosted checkout mock; no browser or network request is made.
-class FakeHostedCheckoutScreen extends StatelessWidget {
-  const FakeHostedCheckoutScreen({
-    super.key,
-    required this.event,
-    required this.controller,
-  });
-
-  final Event event;
-  final PaymentController controller;
-
-  @override
-  Widget build(BuildContext context) => _PaymentScaffold(
-    title: 'PayChangu (Test mode)',
-    controller: controller,
-    event: event,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _testModeLabel(),
-        const SizedBox(height: 20),
-        _infoCard(
-          children: [
-            const Text(
-              'Payment amount',
-              style: TextStyle(color: Colors.white70),
-            ),
-            Text(
-              'MWK ${formatPrice(controller.order?.total ?? 0)}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Transaction reference',
-              style: TextStyle(color: Colors.white70),
-            ),
-            SelectableText(
-              controller.order?.txRef ?? '',
-              style: const TextStyle(color: Colors.white),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        _actionButton(
-          label: 'Simulate successful payment',
-          onPressed: () => _showVerifying(
-            context,
-            event,
-            controller,
-            PaymentOutcome.success,
-          ),
-        ),
-        const SizedBox(height: 10),
-        _actionButton(
-          label: 'Simulate failed payment',
-          onPressed: () => _showVerifying(
-            context,
-            event,
-            controller,
-            PaymentOutcome.failed,
-            failureMessage: 'The payment was declined.',
-          ),
-          secondary: true,
-        ),
-        const SizedBox(height: 10),
-        TextButton(
-          onPressed: () => _showVerifying(
-            context,
-            event,
-            controller,
-            PaymentOutcome.cancelled,
-          ),
-          child: const Text('Cancel'),
-        ),
-      ],
-    ),
-  );
-}
-
-/// Opens the secure PayChangu hosted checkout and verifies through our backend.
+/// Opens the backend hosted checkout in the device browser.
 class PayChanguCheckoutScreen extends StatefulWidget {
   const PayChanguCheckoutScreen({
     super.key,
@@ -154,18 +70,11 @@ class _PayChanguCheckoutScreenState extends State<PayChanguCheckoutScreen> {
       _error = null;
     });
     try {
-      if (!kIsWeb &&
-          (defaultTargetPlatform == TargetPlatform.android ||
-              defaultTargetPlatform == TargetPlatform.iOS)) {
-        await Navigator.push<void>(
-          context,
-          MaterialPageRoute(builder: (_) => _HostedCheckoutWebView(uri: uri)),
-        );
-        return;
-      }
       final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!opened) {
-        throw const PaymentException('Could not open PayChangu checkout.');
+        throw const PaymentException(
+          'Could not open checkout in your browser. Your order is saved; retry opening payment or return to the app to verify it.',
+        );
       }
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
@@ -176,7 +85,7 @@ class _PayChanguCheckoutScreenState extends State<PayChanguCheckoutScreen> {
 
   @override
   Widget build(BuildContext context) => _PaymentScaffold(
-    title: 'PayChangu checkout',
+    title: useFakePayments ? 'Student demo checkout' : 'PayChangu checkout',
     controller: widget.controller,
     event: widget.event,
     child: Column(
@@ -184,10 +93,16 @@ class _PayChanguCheckoutScreenState extends State<PayChanguCheckoutScreen> {
       children: [
         _infoCard(
           children: [
-            const Icon(Icons.lock_outline, color: AppColors.accent, size: 42),
+            Icon(
+              useFakePayments ? Icons.school_outlined : Icons.lock_outline,
+              color: AppColors.accent,
+              size: 42,
+            ),
             const SizedBox(height: 12),
             Text(
-              'Pay MWK ${formatPrice(widget.controller.order?.total ?? 0)} securely on PayChangu.',
+              useFakePayments
+                  ? 'A fake PayChangu page will open in your browser. Select Simulate successful payment there. No real payment is made.'
+                  : 'Pay MWK ${formatPrice(widget.controller.order?.total ?? 0)} securely on PayChangu.',
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.white),
             ),
@@ -201,12 +116,18 @@ class _PayChanguCheckoutScreenState extends State<PayChanguCheckoutScreen> {
         ),
         const SizedBox(height: 20),
         _actionButton(
-          label: _opening ? 'Opening checkout…' : 'Open PayChangu checkout',
+          label: _opening
+              ? 'Opening checkout...'
+              : useFakePayments
+              ? 'Open student demo page'
+              : 'Open PayChangu checkout',
           onPressed: _opening ? () {} : _openCheckout,
         ),
         const SizedBox(height: 8),
-        const Text(
-          'After paying, return here and verify your payment. Tickets are issued only after the server confirms payment.',
+        Text(
+          useFakePayments
+              ? 'After simulating payment in the browser, return here. The app will verify with the backend before showing tickets.'
+              : 'After paying, return here and verify your payment. Tickets are issued only after the server confirms payment.',
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.white70),
         ),
@@ -226,7 +147,7 @@ class _PayChanguCheckoutScreenState extends State<PayChanguCheckoutScreen> {
         _actionButton(
           label: widget.controller.isPendingVerification
               ? 'Recheck payment status'
-              : 'I completed payment — verify',
+              : 'I completed payment - verify',
           secondary: true,
           onPressed: () => _showVerifying(
             context,
@@ -237,51 +158,6 @@ class _PayChanguCheckoutScreenState extends State<PayChanguCheckoutScreen> {
         ),
       ],
     ),
-  );
-}
-
-class _HostedCheckoutWebView extends StatefulWidget {
-  const _HostedCheckoutWebView({required this.uri});
-
-  final Uri uri;
-
-  @override
-  State<_HostedCheckoutWebView> createState() => _HostedCheckoutWebViewState();
-}
-
-class _HostedCheckoutWebViewState extends State<_HostedCheckoutWebView> {
-  late final WebViewController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onNavigationRequest: (request) {
-            final uri = Uri.tryParse(request.url);
-            return uri != null && uri.scheme == 'https'
-                ? NavigationDecision.navigate
-                : NavigationDecision.prevent;
-          },
-        ),
-      )
-      ..loadRequest(widget.uri);
-  }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('Secure checkout'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Return to app'),
-        ),
-      ],
-    ),
-    body: WebViewWidget(controller: _controller),
   );
 }
 

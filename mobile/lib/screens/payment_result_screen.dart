@@ -50,17 +50,6 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
             ? 'Your payment is confirmed and your tickets are ready.'
             : widget.controller.failureReason ?? 'Payment remains pending.';
       });
-      if (result) {
-        await Navigator.pushReplacement<void, void>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => PaymentResultScreen(
-              event: widget.event,
-              controller: widget.controller,
-            ),
-          ),
-        );
-      }
     } catch (error) {
       if (mounted) setState(() => _message = error.toString());
     } finally {
@@ -123,7 +112,11 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
                             ticket.eventName,
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          Text('${ticket.ticketType} · ${ticket.date}'),
+                          Text('Ticket type: ${ticket.ticketType}'),
+                          Text('Date: ${ticket.date}'),
+                          if (ticket.venue.isNotEmpty)
+                            Text('Venue: ${ticket.venue}'),
+                          Text('Ticket ID: ${ticket.id}'),
                           const SizedBox(height: 12),
                           if (ticket.qrPayload.isNotEmpty)
                             QrImageView(
@@ -131,7 +124,6 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
                               version: QrVersions.auto,
                               size: 220,
                             ),
-                          SelectableText(ticket.id),
                         ],
                       ),
                     ),

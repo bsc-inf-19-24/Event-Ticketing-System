@@ -240,7 +240,8 @@ class PaymentController extends ChangeNotifier {
       failureReason = 'The order could not be found.';
       return false;
     }
-    if (_paymentService is ApiPaymentService && outcome == PaymentOutcome.cancelled) {
+    if (_paymentService is ApiPaymentService &&
+        outcome == PaymentOutcome.cancelled) {
       failureReason = 'Payment is still pending. Verify it when you return.';
       _pendingVerification = true;
       _paymentState = 'pending';
@@ -324,7 +325,6 @@ class PaymentController extends ChangeNotifier {
   ) async {
     final verification = await service.verifyOrder(currentOrder.id);
     final preferences = await SharedPreferences.getInstance();
-    await preferences.remove(pendingOrderPreference);
     final remoteOrder = _nestedMap(verification['order']);
     final payment = _nestedMap(verification['payment']);
     final status = _firstString([
@@ -339,30 +339,32 @@ class PaymentController extends ChangeNotifier {
       payment['status'],
       verification['status'],
     ]).toUpperCase();
-      if (status == 'PAID' && paymentStatus == 'PAID') {
-        purchasedTickets = await _readIssuedTickets(
-          service,
-          remoteOrder,
-          currentOrder,
+    if (status == 'PAID' && paymentStatus == 'PAID') {
+      purchasedTickets = await _readIssuedTickets(
+        service,
+        remoteOrder,
+        currentOrder,
+      );
+      if (purchasedTickets.isEmpty) {
+        throw const ApiException(
+          'Payment is confirmed, but the server has not returned the issued tickets yet.',
         );
-        if (purchasedTickets.isEmpty) {
-          throw const ApiException(
-            'Payment is confirmed, but the server has not returned the issued tickets yet.',
-          );
-        }
-        return true;
       }
-      if (status == 'FAILED' || paymentStatus == 'FAILED') {
-        _paymentState = 'failed';
-        _pendingVerification = false;
-        failureReason = 'The server could not confirm this payment.';
-        return false;
-      }
-      _paymentState = 'pending';
-      _pendingVerification = true;
-      await preferences.setString(pendingOrderPreference, currentOrder.id);
-      failureReason = 'Payment is still pending. Recheck when ready.';
+      await preferences.remove(pendingOrderPreference);
+      return true;
+    }
+    if (status == 'FAILED' || paymentStatus == 'FAILED') {
+      _paymentState = 'failed';
+      _pendingVerification = false;
+      await preferences.remove(pendingOrderPreference);
+      failureReason = 'The server could not confirm this payment.';
       return false;
+    }
+    _paymentState = 'pending';
+    _pendingVerification = true;
+    await preferences.setString(pendingOrderPreference, currentOrder.id);
+    failureReason = 'Payment is still pending. Recheck when ready.';
+    return false;
   }
 
   Future<List<Ticket>> _readIssuedTickets(
@@ -372,7 +374,12 @@ class PaymentController extends ChangeNotifier {
   ) async {
     var values = _ticketValues(orderResponse);
     if (values.isEmpty) values = await service.getOrderTickets(currentOrder.id);
-    final userId = _auth.stableUserId!;
+    final userId = _auth.stableUserId ?? currentOrder.userId;
+    if (userId.isEmpty) {
+      throw const ApiException(
+        'The signed-in customer could not be matched to the returned tickets. Reopen the app while signed in and retry verification.',
+      );
+    }
     final tickets = <Ticket>[];
     for (final value in values) {
       final ticket = Ticket.fromServer(value, authenticatedUserId: userId);
@@ -389,8 +396,6 @@ class PaymentController extends ChangeNotifier {
     if (tickets.isNotEmpty) await _ticketsController.addTickets(tickets);
     return tickets;
   }
-
-
 
   List<Map<String, dynamic>> _ticketValues(Map<String, dynamic> orderData) {
     final values = orderData['tickets'] ?? orderData['ticket'];
@@ -440,7 +445,9 @@ class PaymentController extends ChangeNotifier {
     _pendingOrderFingerprint = null;
     _pendingVerification = false;
     _paymentState = 'paid';
-    SharedPreferences.getInstance().then((preferences) => preferences.remove(pendingOrderPreference));
+    SharedPreferences.getInstance().then(
+      (preferences) => preferences.remove(pendingOrderPreference),
+    );
   }
 
   Future<void> _updateOrderStatus(
