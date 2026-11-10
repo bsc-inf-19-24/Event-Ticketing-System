@@ -18,8 +18,6 @@ import 'features/auth/logic/auth_controller.dart';
 import 'features/tickets/logic/connectivity_monitor.dart';
 import 'screens/main_shell.dart';
 
-const _configuredApiBaseUrl = String.fromEnvironment('API_BASE_URL');
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ApiConfig.load();
@@ -28,7 +26,7 @@ Future<void> main() async {
   final secureStorage = SecureStorageService();
   final apiClient = ApiClient.instance;
   final apiAuthService = ApiAuthService(apiClient: apiClient);
-  final useFakeAuth = ApiConfig.useFakeAuth || _configuredApiBaseUrl.isEmpty;
+  final useFakeAuth = ApiConfig.useFakeAuth;
   final AuthRemoteDataSource remoteDataSource = useFakeAuth
       ? MockAuthRemoteDataSource(authService: fakeAuthService)
       : AuthRemoteDataSourceImpl(apiClient: apiClient);

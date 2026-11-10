@@ -35,8 +35,9 @@ void main() {
         final body = jsonDecode(request.body) as Map<String, dynamic>;
         expect(body, {
           'eventId': 'event-4',
-          'ticketTypeId': 'type-2',
-          'quantity': 1,
+          'items': [
+            {'ticketTypeId': 'type-2', 'quantity': 1},
+          ],
         });
         expect(body.containsKey('amount'), isFalse);
         expect(body.containsKey('total'), isFalse);
@@ -55,8 +56,14 @@ void main() {
 
       final response = await service.createOrder(
         eventId: 'event-4',
-        ticketTypeId: 'type-2',
-        quantity: 1,
+        items: const [
+          OrderItem(
+            ticketTypeId: 'type-2',
+            ticketTypeName: 'VIP',
+            unitPrice: 17500,
+            quantity: 1,
+          ),
+        ],
         idempotencyKey: 'retry-key-1',
       );
 
@@ -69,9 +76,9 @@ void main() {
     'payment start accepts HTTPS checkout variants and omits the amount',
     () async {
       final client = MockClient((request) async {
-        expect(request.url.path, '/api/orders/order-10/payment');
+        expect(request.url.path, ApiEndpoints.paymentCheckout);
         final body = jsonDecode(request.body) as Map<String, dynamic>;
-        expect(body['method'], 'airtelMoney');
+        expect(body, {'orderId': 'order-10'});
         expect(body.containsKey('amount'), isFalse);
         expect(body.containsKey('total'), isFalse);
         return http.Response(
@@ -163,7 +170,7 @@ void main() {
           );
         }
         if (request.method == 'POST' &&
-            request.url.path == '/api/orders/order-10/payment') {
+            request.url.path == ApiEndpoints.paymentCheckout) {
           requestBodies['payment'] =
               jsonDecode(request.body) as Map<String, dynamic>;
           return http.Response(
@@ -176,26 +183,29 @@ void main() {
             200,
           );
         }
-        if (request.method == 'GET' &&
-            request.url.path == '/api/orders/order-10') {
+        if (request.method == 'POST' &&
+            request.url.path == ApiEndpoints.paymentVerify) {
           return http.Response(
             jsonEncode({
               'data': {
-                'id': 'order-10',
-                'status': 'paid',
-                'tickets': [
-                  {
-                    'id': 'ticket-10',
-                    'userId': 'U-001',
-                    'eventName': 'Festival',
-                    'date': '2027-01-01',
-                    'venue': 'Lilongwe',
-                    'ticketType': 'VIP',
-                    'status': 'Issued',
-                    'paymentStatus': 'Paid',
-                    'qrCode': 'signed-ticket-10',
-                  },
-                ],
+                'order': {
+                  'id': 'order-10',
+                  'status': 'paid',
+                  'tickets': [
+                    {
+                      'id': 'ticket-10',
+                      'userId': 'U-001',
+                      'eventName': 'Festival',
+                      'date': '2027-01-01',
+                      'venue': 'Lilongwe',
+                      'ticketType': 'VIP',
+                      'status': 'Issued',
+                      'paymentStatus': 'Paid',
+                      'qrCode': 'signed-ticket-10',
+                    },
+                  ],
+                },
+                'paymentStatus': 'paid',
               },
             }),
             200,
@@ -253,8 +263,9 @@ void main() {
       expect(controller.order?.total, 17500);
       expect(requestBodies['order'], {
         'eventId': 'event-4',
-        'ticketTypeId': 'type-2',
-        'quantity': 1,
+        'items': [
+          {'ticketTypeId': 'type-2', 'quantity': 1},
+        ],
       });
       expect(requestBodies['payment']?.containsKey('amount'), isFalse);
       expect(await controller.finish(event, PaymentOutcome.success), isTrue);

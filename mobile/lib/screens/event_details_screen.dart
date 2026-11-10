@@ -16,7 +16,9 @@ class EventDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canBuy = event.status == 'Available';
+    final canBuy =
+        event.isAvailable &&
+        event.ticketTypes.any((ticket) => ticket.isAvailable);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -76,11 +78,35 @@ class EventDetailsScreen extends StatelessWidget {
   }
 
   Widget _buildImage() {
+    final uri = Uri.tryParse(event.imagePath);
+    final isRemote =
+        uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: AspectRatio(
         aspectRatio: 16 / 10,
-        child: Image.asset(event.imagePath, fit: BoxFit.cover),
+        child: event.imagePath.isEmpty
+            ? const ColoredBox(
+                color: AppColors.surface,
+                child: Icon(Icons.event, color: Colors.white54, size: 64),
+              )
+            : isRemote
+            ? Image.network(
+                event.imagePath,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const ColoredBox(
+                  color: AppColors.surface,
+                  child: Icon(Icons.event, color: Colors.white54, size: 64),
+                ),
+              )
+            : Image.asset(
+                event.imagePath,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const ColoredBox(
+                  color: AppColors.surface,
+                  child: Icon(Icons.event, color: Colors.white54, size: 64),
+                ),
+              ),
       ),
     );
   }

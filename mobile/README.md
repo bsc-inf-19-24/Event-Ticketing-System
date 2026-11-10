@@ -87,7 +87,7 @@ secret in the Flutter app.
 
 ## Orders, payments, and offline tickets
 
-The demo launch profile uses sample events and fake payments. To test against
+The demo launch profile uses server events and fake payments. To test against
 the Docker backend, start the container and select **Ticket Master - Real API
 (USB device)** from `.vscode/launch.json`. For a USB-connected Android device,
 first run:
@@ -116,11 +116,10 @@ browser and desktop platforms use the external browser. Returning to the app
 does not prove payment. Tickets are saved only after the backend reports a paid
 order and returns issued tickets.
 
-The current event catalog is still static sample data and has no API adapter or
-server IDs. In the real profile `USE_FAKE_EVENTS=false` hides those samples, so
-real checkout needs the backend event-list contract and event/ticket-type IDs
-before the UI can offer purchasable events. The app rejects missing IDs rather
-than guessing them.
+The home screen always loads events from the server and never shows static sample
+events. When the server has no available events, it displays “No available
+events.” Events need server event and ticket-type IDs for checkout; the app rejects
+missing IDs rather than guessing them.
 
 Tickets returned by the backend are cached per authenticated customer in SQLite
 (mobile) or preferences (web), including the server QR payload. The ticket list
@@ -128,8 +127,8 @@ loads cached records first and refreshes from paid orders when online; ticket
 details use the saved QR payload and remain readable offline.
 
 `USE_FAKE_PAYMENT` is the current payment switch; the legacy
-`USE_FAKE_PAYMENTS` define remains supported. `USE_FAKE_TICKETS` and
-`USE_FAKE_EVENTS` independently control sample data. `ASSUME_PAYMENT_SUCCESS`
+`USE_FAKE_PAYMENTS` define remains supported. `USE_FAKE_TICKETS` controls sample
+ticket behavior. Events are always loaded from the server. `ASSUME_PAYMENT_SUCCESS`
 and `ALLOW_LOCAL_TICKET_FALLBACK` default to `false` and should only be enabled
 for explicitly approved demo testing.
 

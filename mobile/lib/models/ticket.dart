@@ -195,7 +195,7 @@ class Ticket {
         json['ticketStatus'],
         json['ticket_status'],
       ], fallback: 'Issued'),
-      qrData: _qrString(qr),
+      qrData: _qrString(json['qrContent'] ?? json['qr_content'] ?? qr),
       ticketType: _firstString([
         json['ticketTypeName'],
         json['ticket_type_name'],

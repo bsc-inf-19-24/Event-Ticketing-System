@@ -2,8 +2,20 @@ class TicketType {
   final String? id;
   final String name;
   final int price;
+  final int? remainingInventory;
+  final String status;
 
-  const TicketType({this.id, required this.name, required this.price});
+  const TicketType({
+    this.id,
+    required this.name,
+    required this.price,
+    this.remainingInventory,
+    this.status = 'Available',
+  });
+
+  bool get isAvailable =>
+      _isPurchasableStatus(status) &&
+      (remainingInventory == null || remainingInventory! > 0);
 }
 
 class Event {
@@ -40,4 +52,23 @@ class Event {
   });
 
   String get timeRange => endTime != null ? '$time - $endTime' : time;
+
+  bool get isAvailable => _isPurchasableStatus(status);
+}
+
+bool _isPurchasableStatus(String value) {
+  final normalized = value
+      .trim()
+      .toLowerCase()
+      .replaceAll('-', '_')
+      .replaceAll(' ', '_');
+  return const {
+    'available',
+    'published',
+    'active',
+    'open',
+    'on_sale',
+    'onsale',
+    'selling',
+  }.contains(normalized);
 }

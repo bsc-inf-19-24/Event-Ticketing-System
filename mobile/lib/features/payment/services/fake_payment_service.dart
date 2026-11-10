@@ -146,7 +146,7 @@ class FakePaymentService implements PaymentService {
 
 const useFakePayment = bool.fromEnvironment(
   'USE_FAKE_PAYMENT',
-  defaultValue: bool.fromEnvironment('USE_FAKE_PAYMENTS', defaultValue: true),
+  defaultValue: bool.fromEnvironment('USE_FAKE_PAYMENTS', defaultValue: false),
 );
 
 const assumePaymentSuccess = bool.fromEnvironment(
@@ -161,10 +161,7 @@ const useFakeTickets = bool.fromEnvironment(
   'USE_FAKE_TICKETS',
   defaultValue: true,
 );
-const useFakeEvents = bool.fromEnvironment(
-  'USE_FAKE_EVENTS',
-  defaultValue: true,
-);
+
 
 /// Kept as a source-compatible alias for existing widgets and tests.
 const useFakePayments = useFakePayment;

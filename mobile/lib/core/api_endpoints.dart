@@ -10,6 +10,8 @@ class ApiEndpoints {
       '/api/events/$eventId/ticket-types';
 
   static const orders = '/api/orders';
+  static String orderTickets(String id) => '/api/orders/$id/tickets';
+  static String cancelOrder(String id) => '/api/orders/$id/cancel';
   static const myOrders = '/api/orders/my';
   static String order(String id) => '/api/orders/$id';
   static String orderPayment(String orderId) =>
