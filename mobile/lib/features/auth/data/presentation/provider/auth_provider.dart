@@ -10,11 +10,14 @@ import 'package:mobile/features/auth/domain/usecases/register_usecase.dart';
 import 'package:mobile/features/auth/logic/auth_controller.dart';
 import 'package:mobile/features/auth/models/app_user.dart';
 
-const _googleClientId = String.fromEnvironment('GOOGLE_CLIENT_ID');
-const _googleServerClientId = String.fromEnvironment(
-  'GOOGLE_SERVER_CLIENT_ID',
-  defaultValue: '837271104289-k5fgkt8bu19vasi84c49tg5ioi09pkla.apps.googleusercontent.com',
+// The first argument is the NAME of a --dart-define variable.
+// The actual client ID goes in defaultValue.
+const _googleClientId = String.fromEnvironment(
+  'GOOGLE_CLIENT_ID',
+  defaultValue:
+  '837271104289-k5fgkt8bu19vasi84c49tg5ioi09pkla.apps.googleusercontent.com',
 );
+
 Future<void>? _googleSignInInitialization;
 
 class AuthProvider extends ChangeNotifier {
@@ -24,9 +27,9 @@ class AuthProvider extends ChangeNotifier {
     RegisterUseCase? registerUseCase,
     AuthRepository? authRepository,
   }) : registerUseCase =
-           registerUseCase ??
-           RegisterUseCase(repository: loginUseCase.repository),
-       authRepository = authRepository ?? loginUseCase.repository;
+      registerUseCase ??
+          RegisterUseCase(repository: loginUseCase.repository),
+        authRepository = authRepository ?? loginUseCase.repository;
 
   final LoginUseCase loginUseCase;
   final RegisterUseCase registerUseCase;
@@ -95,10 +98,9 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> loginWithGoogle() => _runAuth(() async {
     final google = GoogleSignIn.instance;
     _googleSignInInitialization ??= google.initialize(
-      clientId: _googleClientId.isEmpty ? null : _googleClientId,
-      serverClientId: _googleServerClientId.isEmpty
-          ? null
-          : _googleServerClientId,
+      clientId: _googleClientId,
+      // serverClientId is not supported on web, so only pass it elsewhere.
+      serverClientId: kIsWeb ? null : _googleClientId,
     );
     await _googleSignInInitialization;
     final account = await google.authenticate();

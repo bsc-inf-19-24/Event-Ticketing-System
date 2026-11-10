@@ -66,16 +66,22 @@ find the account, and return the same JSON shape as `POST /auth/login`, includin
 a non-empty `token` (or `accessToken`). The Google ID token must not be used as
 the application session token.
 
-The backend's web OAuth client ID is configured as the default server client ID
-in the app, so the returned Google ID token is issued for the backend's
-audience. To override it, or to provide a platform-specific iOS client ID, use:
+### Configure the backend Google client ID
+
+Pass your backend's Google **Web application OAuth client ID** as
+`GOOGLE_SERVER_CLIENT_ID` when launching the app. This makes Google issue an ID
+token for the audience your backend validates. Replace the placeholder below
+with the client ID from your backend/Google Cloud configuration:
 
 ```sh
 flutter run \
   --dart-define=API_BASE_URL=https://your-api.example.com \
-  --dart-define=GOOGLE_SERVER_CLIENT_ID=your-web-client-id.apps.googleusercontent.com \
-  --dart-define=GOOGLE_CLIENT_ID=your-ios-client-id.apps.googleusercontent.com
+  --dart-define=GOOGLE_SERVER_CLIENT_ID=YOUR_WEB_CLIENT_ID.apps.googleusercontent.com
 ```
+
+For iOS, also pass the iOS OAuth client ID as `GOOGLE_CLIENT_ID`. Android uses
+the package name and signing-certificate SHA-1 registration described below.
+These are public OAuth client IDs; never put a client secret in the Flutter app.
 
 In Google Cloud Console, register the Android app using its package name
 (`com.example.mobile`) and signing-certificate SHA-1 fingerprints. For iOS,
