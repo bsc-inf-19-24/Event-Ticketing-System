@@ -92,7 +92,6 @@ class PaymentController extends ChangeNotifier {
           event: event,
           item: items.single,
           method: method,
-          phone: phone,
           userId: _auth.stableUserId!,
           now: now,
           randomDigits: randomDigits,
@@ -124,7 +123,7 @@ class PaymentController extends ChangeNotifier {
           firstName: names.first,
           lastName: names.length > 1 ? names.skip(1).join(' ') : '',
           txRef: txRef,
-          mobile: method == PaymentMethod.card ? null : phone,
+          mobile: method == PaymentMethod.card || phone.isEmpty ? null : phone,
           meta: {'order_id': createdOrder.id},
         ),
       );
@@ -151,7 +150,6 @@ class PaymentController extends ChangeNotifier {
     required Event event,
     required OrderItem item,
     required PaymentMethod method,
-    required String phone,
     required String userId,
     required DateTime now,
     required String randomDigits,
@@ -216,7 +214,7 @@ class PaymentController extends ChangeNotifier {
     final session = await service.initiateOrderPayment(
       orderId: orderId,
       method: method,
-      phone: phone,
+      phone: '',
     );
     if (session.amount > 0 && session.amount != serverTotal) {
       throw const PaymentException(

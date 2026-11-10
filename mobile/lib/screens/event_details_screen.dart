@@ -4,6 +4,7 @@ import '../models/event.dart';
 import '../theme/app_colors.dart';
 import '../utils/format.dart';
 import '../utils/auth_guard.dart';
+import '../widgets/event_image.dart';
 import 'ticket_selection_screen.dart';
 
 class EventDetailsScreen extends StatelessWidget {
@@ -19,6 +20,12 @@ class EventDetailsScreen extends StatelessWidget {
     final canBuy =
         event.isAvailable &&
         event.ticketTypes.any((ticket) => ticket.isAvailable);
+    final buyLabel = !event.isAvailable
+        ? event.statusLabel
+        : event.ticketTypes.isNotEmpty &&
+              !event.ticketTypes.any((ticket) => ticket.isAvailable)
+        ? 'Sold out'
+        : 'Buy Ticket';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -67,7 +74,7 @@ class EventDetailsScreen extends StatelessWidget {
                           );
                         }
                       : null,
-                  child: Text(canBuy ? 'Buy Ticket' : 'Not available'),
+                  child: Text(buyLabel),
                 ),
               ),
             ),
@@ -77,39 +84,13 @@ class EventDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildImage() {
-    final uri = Uri.tryParse(event.imagePath);
-    final isRemote =
-        uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: AspectRatio(
-        aspectRatio: 16 / 10,
-        child: event.imagePath.isEmpty
-            ? const ColoredBox(
-                color: AppColors.surface,
-                child: Icon(Icons.event, color: Colors.white54, size: 64),
-              )
-            : isRemote
-            ? Image.network(
-                event.imagePath,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => const ColoredBox(
-                  color: AppColors.surface,
-                  child: Icon(Icons.event, color: Colors.white54, size: 64),
-                ),
-              )
-            : Image.asset(
-                event.imagePath,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => const ColoredBox(
-                  color: AppColors.surface,
-                  child: Icon(Icons.event, color: Colors.white54, size: 64),
-                ),
-              ),
-      ),
-    );
-  }
+  Widget _buildImage() => ClipRRect(
+    borderRadius: BorderRadius.circular(16),
+    child: AspectRatio(
+      aspectRatio: 16 / 10,
+      child: EventImage(imagePath: event.imagePath, iconSize: 64),
+    ),
+  );
 
   // One reusable rounded box for both cards
   Widget _card({required Widget child}) {
@@ -137,17 +118,19 @@ class EventDetailsScreen extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          if (event.genre.isNotEmpty) ...[
+          if (event.displayGenre.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(
-              event.genre,
+              event.displayGenre,
               style: const TextStyle(color: Colors.white, fontSize: 18),
             ),
           ],
-          const SizedBox(height: 16),
-          Text(event.date, style: _bodyStyle),
-          Text(event.timeRange, style: _bodyStyle),
-          Text(event.venue, style: _bodyStyle),
+          if (event.hasStart) ...[
+            const SizedBox(height: 16),
+            Text(event.displayDate, style: _bodyStyle),
+            Text(event.timeRange, style: _bodyStyle),
+          ],
+          if (event.place.isNotEmpty) Text(event.place, style: _bodyStyle),
         ],
       ),
     );
@@ -158,14 +141,22 @@ class EventDetailsScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (event.ticketTypes.isEmpty)
+            Text('No tickets on sale yet', style: _bodyStyle),
           for (final ticket in event.ticketTypes) ...[
-            Text(ticket.name, style: _bodyStyle),
+            Row(
+              children: [
+                Expanded(child: Text('${ticket.name} Ticket', style: _bodyStyle)),
+                if (ticket.remainingInventory == 0)
+                  const Text('Sold out', style: _bodyStyle),
+              ],
+            ),
             Text('Price: MWK ${formatPrice(ticket.price)}', style: _bodyStyle),
             const SizedBox(height: 8),
           ],
           const SizedBox(height: 8),
           Text('Capacity: ${event.capacity}', style: _bodyStyle),
-          Text('Status: ${event.status}', style: _bodyStyle),
+          Text('Status: ${event.statusLabel}', style: _bodyStyle),
         ],
       ),
     );

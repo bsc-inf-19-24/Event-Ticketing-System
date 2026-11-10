@@ -67,7 +67,7 @@ void main() {
     );
 
     final unavailableButton = tester.widget<ElevatedButton>(
-      find.widgetWithText(ElevatedButton, 'Not available'),
+      find.widgetWithText(ElevatedButton, 'Sold out'),
     );
     expect(unavailableButton.onPressed, isNull);
   });

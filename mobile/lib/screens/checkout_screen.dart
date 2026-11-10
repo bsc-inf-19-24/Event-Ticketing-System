@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../features/auth/logic/auth_controller.dart';
 import '../features/orders/models/order.dart';
 import '../features/payment/logic/payment_controller.dart';
 import '../features/payment/models/payment_models.dart';
@@ -11,7 +10,7 @@ import '../theme/app_colors.dart';
 import '../utils/format.dart';
 import 'payment_flow_screens.dart';
 
-/// Reviews an order and collects the selected payment method.
+/// Confirms the selected tickets before handing payment off to PayChangu.
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({
     super.key,
@@ -29,26 +28,22 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
-  final _phoneController = TextEditingController();
   final _paymentController = PaymentController();
-  PaymentMethod _method = PaymentMethod.airtelMoney;
+  static const _method = PaymentMethod.card;
   bool _processing = false;
   bool _cancelRequested = false;
   Future<void>? _beginOperation;
   Future<bool?>? _cancelPrompt;
-  String? _phoneError;
   String? _error;
 
   @override
   void dispose() {
-    _phoneController.dispose();
     _paymentController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = authController.user;
     return PopScope(
       canPop: !_processing,
       onPopInvokedWithResult: (didPop, _) {
@@ -76,23 +71,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(widget.event.title, style: _title),
-                          const SizedBox(height: 8),
-                          Text(widget.event.date, style: _muted),
-                          Text(widget.event.venue, style: _muted),
+                          if (widget.event.hasStart) ...[
+                            const SizedBox(height: 8),
+                            Text(widget.event.displayDate, style: _muted),
+                            Text(widget.event.timeRange, style: _muted),
+                          ],
+                          if (widget.event.place.isNotEmpty)
+                            Text(widget.event.place, style: _muted),
                           const Divider(color: Colors.white24, height: 24),
-                          if (widget.items.isNotEmpty)
+                          for (final item in widget.items)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 8),
                               child: Row(
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      widget.items.first.ticketTypeName,
+                                      '${item.ticketTypeName} Ticket × ${item.quantity}',
                                       style: _muted,
                                     ),
                                   ),
                                   Text(
-                                    'MWK ${formatPrice(widget.items.first.unitPrice)}',
+                                    'MWK ${formatPrice(item.unitPrice * item.quantity)}',
                                     style: _muted,
                                   ),
                                 ],
@@ -114,75 +113,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                     const SizedBox(height: 12),
                     _card(
-                      child: Column(
+                      child: const Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Customer', style: _title),
-                          const SizedBox(height: 8),
-                          Text(user?.name ?? '', style: _muted),
-                          Text(user?.email ?? '', style: _muted),
-                          const SizedBox(height: 12),
-                          if (_method != PaymentMethod.card)
-                            TextField(
-                              controller: _phoneController,
-                              keyboardType: TextInputType.phone,
-                              maxLength: 10,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
-                                labelText: 'Mobile money phone number',
-                                hintText: '08XXXXXXXX or 09XXXXXXXX',
-                                errorText: _phoneError,
-                                counterText: '',
-                                labelStyle: _muted,
-                                enabledBorder: const UnderlineInputBorder(
-                                  borderSide: BorderSide(color: Colors.white30),
-                                ),
-                              ),
-                              onChanged: (_) {
-                                if (_phoneError != null) {
-                                  setState(() => _phoneError = null);
-                                }
-                              },
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _card(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Payment method', style: _title),
-                          const SizedBox(height: 8),
-                          RadioGroup<PaymentMethod>(
-                            groupValue: _method,
-                            onChanged: (value) {
-                              if (_processing || value == null) return;
-                              setState(() {
-                                _method = value;
-                                _phoneError = null;
-                              });
-                            },
-                            child: Column(
-                              children: [
-                                for (final method in PaymentMethod.values)
-                                  RadioListTile<PaymentMethod>(
-                                    value: method,
-                                    enabled: !_processing,
-                                    activeColor: AppColors.accent,
-                                    contentPadding: EdgeInsets.zero,
-                                    title: Text(
-                                      _label(method),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          const Text(
-                            'Card details are never collected in this test flow.',
+                          Text('Payment', style: _title),
+                          SizedBox(height: 8),
+                          Text(
+                            'You will enter your payment details securely on PayChangu.',
                             style: _muted,
                           ),
                         ],
@@ -231,7 +168,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   color: Colors.white,
                                 ),
                               )
-                            : Text('Pay MWK ${formatPrice(widget.total)}'),
+                            : const Text('Proceed to payment'),
                       ),
                     ),
                   ],
@@ -261,25 +198,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     child: child,
   );
 
-  String _label(PaymentMethod method) => switch (method) {
-    PaymentMethod.airtelMoney => 'Airtel Money',
-    PaymentMethod.tnmMpamba => 'TNM Mpamba',
-    PaymentMethod.card => 'Card',
-  };
-
   Future<void> _pay() async {
-    final phone = _phoneController.text.trim();
-    if (_method != PaymentMethod.card &&
-        !RegExp(r'^0[89]\d{8}$').hasMatch(phone)) {
-      setState(
-        () => _phoneError = 'Enter a 10-digit number starting with 08 or 09.',
-      );
-      return;
-    }
     setState(() {
       _processing = true;
       _error = null;
-      _phoneError = null;
     });
     try {
       final operation = _paymentController.begin(
@@ -287,7 +209,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         items: widget.items,
         total: widget.total,
         method: _method,
-        phone: phone,
+        phone: '',
       );
       _beginOperation = operation;
       await operation;
@@ -296,16 +218,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (cancelPrompt != null) await cancelPrompt;
       if (!mounted || _cancelRequested) return;
       final page = useFakePayments
-          ? (_method == PaymentMethod.card
-                ? FakeHostedCheckoutScreen(
-                    event: widget.event,
-                    controller: _paymentController,
-                  )
-                : MobileMoneyApprovalScreen(
-                    event: widget.event,
-                    controller: _paymentController,
-                    phone: phone,
-                  ))
+          ? FakeHostedCheckoutScreen(
+              event: widget.event,
+              controller: _paymentController,
+            )
           : PayChanguCheckoutScreen(
               event: widget.event,
               controller: _paymentController,

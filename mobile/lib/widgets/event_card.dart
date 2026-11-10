@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../utils/format.dart';
 import '../models/event.dart';
 import '../theme/app_colors.dart';
+import 'event_image.dart';
 
 class EventCard extends StatelessWidget {
   final Event event;
@@ -10,33 +11,11 @@ class EventCard extends StatelessWidget {
 
   const EventCard({super.key, required this.event, this.onTap});
 
-  Widget _eventImage(double width) {
-    final uri = Uri.tryParse(event.imagePath);
-    final remote =
-        uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
-    final fallback = Container(
-      width: width,
-      height: 200,
-      color: AppColors.surface,
-      child: const Icon(Icons.event, color: Colors.white54, size: 44),
-    );
-    if (event.imagePath.isEmpty) return fallback;
-    return remote
-        ? Image.network(
-            event.imagePath,
-            width: width,
-            height: 200,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => fallback,
-          )
-        : Image.asset(
-            event.imagePath,
-            width: width,
-            height: 200,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => fallback,
-          );
-  }
+  Widget _eventImage(double width) => EventImage(
+    imagePath: event.imagePath,
+    width: width,
+    height: 200,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -82,18 +61,20 @@ class EventCard extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              if (event.hasStart) ...[
+                                Text(
+                                  event.displayDate,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  event.displayStartTime,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                               Text(
-                                event.date,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                event.time,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                event.venue,
+                                event.place,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -101,10 +82,16 @@ class EventCard extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          'Price: MWK ${formatPrice(event.price)}',
+                          event.ticketTypes.isEmpty
+                              ? 'Price: TBA'
+                              : event.price == 0
+                              ? 'Price: Free'
+                              : 'Price: MWK ${formatPrice(event.price)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
