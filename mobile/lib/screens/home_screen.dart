@@ -162,9 +162,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       onTap: () async {
                         var selectedEvent = event;
                         final eventId = event.id;
-                        if (eventId != null &&
-                            eventId.isNotEmpty &&
-                            event.ticketTypes.isEmpty) {
+                        if (eventId != null && eventId.isNotEmpty) {
                           try {
                             selectedEvent = await _eventApi.details(eventId);
                           } catch (error) {

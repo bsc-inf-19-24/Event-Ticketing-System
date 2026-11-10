@@ -25,9 +25,7 @@ class _TicketSelectionScreenState extends State<TicketSelectionScreen> {
   @override
   void initState() {
     super.initState();
-    _types = widget.event.ticketTypes.isEmpty
-        ? [TicketType(name: 'Standard', price: widget.event.price)]
-        : widget.event.ticketTypes;
+    _types = widget.event.ticketTypes;
     if (_types.length == 1 && _types.single.isAvailable) _selectedIndex = 0;
   }
 

@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+
 import '../../core/api_client.dart';
 import '../../core/api_endpoints.dart';
 import '../../models/event.dart';
@@ -26,44 +28,24 @@ class EventApi {
       ApiEndpoints.event(Uri.encodeComponent(id)),
     );
     final data = _objectResponse(response, 'event');
-    var event = _event(data, baseUrl: _client.effectiveBaseUrl);
-    if (event.ticketTypes.isNotEmpty) return event;
-
-    final typesResponse = await _client.get(
-      ApiEndpoints.ticketTypes(Uri.encodeComponent(id)),
-    );
-    final parsedTypes = _listResponse(
-      typesResponse,
-      'ticket types',
-    ).map((value) => _ticketType(_map(value))).toList();
-    return Event(
-      id: event.id,
-      title: event.title,
-      date: event.date,
-      time: event.time,
-      venue: event.venue,
-      price: event.price,
-      imagePath: event.imagePath,
-      category: event.category,
-      genre: event.genre,
-      endTime: event.endTime,
-      ticketTypes: parsedTypes,
-      capacity: event.capacity,
-      status: event.status,
-    );
+    return _event(data, baseUrl: _client.effectiveBaseUrl);
   }
 }
 
 Event _event(Map<String, dynamic> data, {required String baseUrl}) {
   final types = data['ticketTypes'] ?? data['ticket_types'] ?? data['tickets'];
-  final dateTime = _first(data, [
+  final startText = _first(data, [
+    'startTime',
+    'dateTime',
     'date',
     'eventDate',
     'startDate',
     'startsAt',
     'starts_at',
   ]);
-  final parsedDate = DateTime.tryParse(dateTime);
+  final parsedStart = DateTime.tryParse(startText);
+  final endText = _first(data, ['endTime', 'endDate', 'endsAt', 'ends_at']);
+  final parsedEnd = DateTime.tryParse(endText);
   final cover = _first(data, [
     'coverImagePath',
     'imagePath',
@@ -73,32 +55,32 @@ Event _event(Map<String, dynamic> data, {required String baseUrl}) {
   final coverUri = Uri.tryParse(cover);
   return Event(
     id: _first(data, ['id', 'eventId', 'event_id']),
-    title: _first(data, ['name', 'title'], fallback: 'Event'),
-    date: parsedDate == null
-        ? dateTime
-        : '${parsedDate.day.toString().padLeft(2, '0')}/${parsedDate.month.toString().padLeft(2, '0')}/${parsedDate.year}',
-    time: parsedDate == null ? '' : _formatTime(parsedDate),
-    venue: _first(data, ['venue', 'location', 'venueName']),
-    price: _integer(data['price']),
+    title: _first(data, ['title', 'name'], fallback: 'Event'),
+    date: parsedStart != null
+        ? DateFormat('EEEE, d MMMM yyyy').format(parsedStart)
+        : RegExp(r'^\\d{4}-\\d{2}-\\d{2}').hasMatch(startText)
+        ? ''
+        : startText,
+    time: parsedStart == null ? '' : DateFormat('h:mm a').format(parsedStart),
+    startDateTime: parsedStart,
+    endDateTime: parsedEnd,
+    venue: _first(data, ['venue', 'venueName']),
+    location: _first(data, ['location']),
+    price: _integer(data['minPrice'] ?? data['price']),
     imagePath: cover.isEmpty || (coverUri?.hasScheme ?? false)
         ? cover
         : Uri.parse('$baseUrl/').resolve(cover).toString(),
     category: _first(data, ['category', 'categoryName']),
-    genre: _first(data, ['genre', 'description']),
-    endTime: _nullable(data['endDate'] ?? data['endTime'] ?? data['endsAt']),
+    genre: _first(data, ['genre']),
+    endTime: endText,
     ticketTypes: types is List
         ? types
               .whereType<Map>()
-              .map((value) => _ticketType(Map<String, dynamic>.from(value)))
+              .map((value) => _ticketType(_map(value)))
               .toList()
         : const [],
     capacity: _integer(data['capacity']),
-    status: _first(data, [
-      'status',
-      'availability',
-      'publicationStatus',
-      'publication_status',
-    ], fallback: 'Unavailable'),
+    availability: _availability(data),
   );
 }
 
@@ -124,15 +106,20 @@ TicketType _ticketType(Map<String, dynamic> data) => TicketType(
   ], fallback: 'Available'),
 );
 
-String _formatTime(DateTime date) {
-  final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
-  return '$hour:${date.minute.toString().padLeft(2, '0')} ${date.hour < 12 ? 'AM' : 'PM'}';
+
+
+String _availability(Map<String, dynamic> data) {
+  final explicit = _first(data, ['availability']);
+  if (explicit.isNotEmpty) return explicit;
+  final legacyStatus = _first(data, ['status'], fallback: 'UNAVAILABLE');
+  return const {'PUBLISHED', 'ACTIVE'}.contains(legacyStatus.toUpperCase())
+      ? 'AVAILABLE'
+      : legacyStatus;
 }
 
 int _integer(dynamic value) =>
     value is num ? value.toInt() : int.tryParse('$value') ?? 0;
 int? _nullableInteger(dynamic value) => value == null ? null : _integer(value);
-String _nullable(dynamic value) => value is String ? value : '';
 String _first(
   Map<String, dynamic> data,
   List<String> keys, {
@@ -173,6 +160,8 @@ List<dynamic> _listResponse(dynamic response, String name) {
 }
 
 Map<String, dynamic> _map(dynamic value) {
-  if (value is Map) return Map<String, dynamic>.from(value);
-  throw const ApiException('The server returned invalid event data.');
+  if (value is Map) {
+    return value.map((key, item) => MapEntry(key.toString(), item));
+  }
+  return <String, dynamic>{};
 }
