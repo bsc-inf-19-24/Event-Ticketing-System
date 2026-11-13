@@ -99,8 +99,13 @@ the Docker backend, start the container and select **Ticket Master - Real API
 first run:
 
 ```sh
-adb reverse tcp:8080 tcp:8080
+adb reverse tcp:8081 tcp:8081
 ```
+
+The USB-device launch profile and app server setting use
+`http://localhost:8081`. The API is published on host port `8081` so the
+physical device reaches the API service instead of the other service using
+port `8080`.
 
 The emulator profile uses `http://10.0.2.2:8080`; that address is not for a
 physical Android device. The real profile disables fake authentication,

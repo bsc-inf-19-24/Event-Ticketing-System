@@ -382,7 +382,11 @@ class PaymentController extends ChangeNotifier {
     }
     final tickets = <Ticket>[];
     for (final value in values) {
-      final ticket = Ticket.fromServer(value, authenticatedUserId: userId);
+      final ticket = Ticket.fromServer(
+        value,
+        authenticatedUserId: userId,
+        imageBaseUrl: service.effectiveBaseUrl,
+      );
       if (ticket.id.isEmpty) {
         throw const ApiException('The server returned a ticket without an ID.');
       }

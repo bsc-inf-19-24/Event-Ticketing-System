@@ -18,7 +18,7 @@
       "type": "dart",
       "program": "lib/main.dart",
       "args": [
-        "--dart-define=API_BASE_URL=http://localhost:8080",
+        "--dart-define=API_BASE_URL=http://localhost:8081",
         "--dart-define=USE_FAKE_AUTH=false",
         "--dart-define=USE_FAKE_PAYMENT=false",
         "--dart-define=USE_FAKE_TICKETS=false",

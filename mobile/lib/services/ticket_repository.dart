@@ -98,6 +98,7 @@ class TicketRepository {
             final ticket = Ticket.fromServer(
               value,
               authenticatedUserId: userId,
+              imageBaseUrl: ordersApi.effectiveBaseUrl,
             );
             if (ticket.id.isEmpty) {
               throw const ApiException(

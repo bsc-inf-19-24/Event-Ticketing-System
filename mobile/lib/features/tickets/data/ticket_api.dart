@@ -23,7 +23,7 @@ class TicketApi {
     final qrPayloads = <String>{};
 
     for (final value in values) {
-      final ticket = Ticket.fromApiJson(
+      final ticket = _parseTicket(
         _ticketMap(value),
         authenticatedUserId: authenticatedUserId,
       );
@@ -54,10 +54,7 @@ class TicketApi {
       '/api/tickets/${Uri.encodeComponent(ticketId)}',
     );
     final body = _ticketDetailsMap(response);
-    final ticket = Ticket.fromApiJson(
-      body,
-      authenticatedUserId: authenticatedUserId,
-    );
+    final ticket = _parseTicket(body, authenticatedUserId: authenticatedUserId);
     if (ticket.id.isEmpty || ticket.id != ticketId) {
       throw ApiException('The server returned different ticket details.');
     }
@@ -146,10 +143,7 @@ class TicketApi {
     String? fallbackId,
   }) {
     final body = _ticketDetailsMap(response);
-    var ticket = Ticket.fromApiJson(
-      body,
-      authenticatedUserId: authenticatedUserId,
-    );
+    var ticket = _parseTicket(body, authenticatedUserId: authenticatedUserId);
     if (ticket.id.isEmpty && fallbackId != null && fallbackId.isNotEmpty) {
       ticket = ticket.copyWith(id: fallbackId);
     }
@@ -163,6 +157,15 @@ class TicketApi {
     }
     return ticket;
   }
+
+  Ticket _parseTicket(
+    Map<String, dynamic> body, {
+    required String authenticatedUserId,
+  }) => Ticket.fromApiJson(
+    body,
+    authenticatedUserId: authenticatedUserId,
+    imageBaseUrl: apiClient.effectiveBaseUrl,
+  );
 
   List<dynamic> _ticketList(dynamic response) {
     if (response is List) return response;

@@ -132,6 +132,7 @@ class Ticket {
   factory Ticket.fromApiJson(
     Map<String, dynamic> json, {
     required String authenticatedUserId,
+    String? imageBaseUrl,
   }) {
     final event = _nestedMap(json['event']);
     final ticketTypeData = _nestedMap(
@@ -217,13 +218,20 @@ class Ticket {
         json['createdAt'],
         json['created_at'],
       ]),
-      imagePath: _firstString([
-        json['imagePath'],
-        json['image_path'],
-        event['imagePath'],
-        event['image_path'],
-        event['image'],
-      ]),
+      imagePath: _resolveServerImagePath(
+        _firstString([
+          json['imagePath'],
+          json['image_path'],
+          json['coverImagePath'],
+          json['cover_image_path'],
+          event['imagePath'],
+          event['image_path'],
+          event['coverImagePath'],
+          event['cover_image_path'],
+          event['image'],
+        ]),
+        imageBaseUrl,
+      ),
       userId: ownerId.isEmpty ? authenticatedUserId : ownerId,
       paymentId: _firstString([
         json['paymentId'],
@@ -257,10 +265,12 @@ class Ticket {
   factory Ticket.fromServer(
     Map<String, dynamic> json, {
     required String authenticatedUserId,
+    String? imageBaseUrl,
   }) {
     final parsed = Ticket.fromApiJson(
       json,
       authenticatedUserId: authenticatedUserId,
+      imageBaseUrl: imageBaseUrl,
     );
     return parsed.copyWith(source: 'server');
   }
@@ -306,6 +316,16 @@ class Ticket {
     paymentStatus: paymentStatus ?? this.paymentStatus,
     source: source ?? this.source,
   );
+}
+
+String _resolveServerImagePath(String imagePath, String? baseUrl) {
+  if (imagePath.isEmpty || imagePath.startsWith('assets/')) return imagePath;
+  final uri = Uri.tryParse(imagePath);
+  if (uri != null && uri.hasScheme) return imagePath;
+  if (baseUrl == null || baseUrl.isEmpty) return imagePath;
+  return Uri.parse('${baseUrl.replaceFirst(RegExp(r'/+$'), '')}/')
+      .resolve(imagePath)
+      .toString();
 }
 
 String _stringValue(dynamic value, {String fallback = ''}) =>

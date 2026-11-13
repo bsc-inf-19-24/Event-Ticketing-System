@@ -11,6 +11,8 @@ class ApiPaymentService implements PaymentService {
 
   final ApiClient _apiClient;
 
+  String get effectiveBaseUrl => _apiClient.effectiveBaseUrl;
+
   Future<Map<String, dynamic>> createOrder({
     required String eventId,
     required List<OrderItem> items,
