@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/storage/storage_scope.dart';
 import '../../../features/auth/logic/auth_controller.dart';
 import '../../../models/ticket.dart';
 import '../../../services/ticket_repository.dart';
@@ -47,7 +48,7 @@ class TicketsController extends ChangeNotifier {
   DateTime? get lastSynced => _lastSynced;
 
   void _onAuthChanged() {
-    final userId = _auth.stableUserId;
+    final userId = StorageScope.currentKey(auth: _auth);
     if (userId == _userId) return;
     _userId = userId;
     _loadGeneration++;
@@ -70,7 +71,7 @@ class TicketsController extends ChangeNotifier {
 
   /// Loads only tickets belonging to the current authenticated user.
   Future<void> load() async {
-    final userId = _auth.stableUserId;
+    final userId = StorageScope.currentKey(auth: _auth);
     _userId = userId;
     final generation = ++_loadGeneration;
     if (userId == null) {
@@ -91,7 +92,7 @@ class TicketsController extends ChangeNotifier {
           _auth.stableUserId != userId) {
         return;
       }
-      _tickets = cachedTickets;
+      _tickets = _dedupe(cachedTickets);
       _lastSynced = lastSynced;
       if (!_disposed) notifyListeners();
       final result = await _repository.load(
@@ -101,7 +102,7 @@ class TicketsController extends ChangeNotifier {
       if (!_disposed &&
           generation == _loadGeneration &&
           _auth.stableUserId == userId) {
-        _tickets = result.tickets;
+        _tickets = _dedupe(result.tickets);
         _isOffline = result.isOffline;
         _lastSynced = result.lastSynced;
       }
@@ -124,9 +125,19 @@ class TicketsController extends ChangeNotifier {
     }
   }
 
+  List<Ticket> _dedupe(List<Ticket> tickets) {
+    final byId = <String, Ticket>{};
+    for (final ticket in tickets) {
+      if (ticket.id.isNotEmpty && ticket.userId == _userId) {
+        byId[ticket.id] = ticket;
+      }
+    }
+    return byId.values.toList();
+  }
+
   /// Persists tickets and updates the current user's list.
   Future<void> addTickets(List<Ticket> tickets) async {
-    final userId = _auth.stableUserId;
+    final userId = StorageScope.currentKey(auth: _auth);
     if (userId == null) throw StateError('A logged-in customer is required.');
     if (tickets.any((ticket) => ticket.userId != userId)) {
       throw StateError('Tickets can only be saved for their owning customer.');
@@ -136,7 +147,7 @@ class TicketsController extends ChangeNotifier {
   }
 
   Future<Ticket> loadTicketDetails(String ticketId) {
-    final userId = _auth.stableUserId;
+    final userId = StorageScope.currentKey(auth: _auth);
     if (userId == null) {
       throw StateError('A logged-in customer is required.');
     }

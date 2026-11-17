@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../core/api_client.dart';
 import '../../core/api_endpoints.dart';
 import '../../models/event.dart';
+import '../../utils/server_image_url.dart';
 
 class EventApi {
   EventApi({ApiClient? client}) : _client = client ?? ApiClient.instance;
@@ -18,9 +19,37 @@ class EventApi {
       '${ApiEndpoints.events}${query.isEmpty ? '' : '?${Uri(queryParameters: query).query}'}',
     );
     final values = _listResponse(response, 'events');
-    return values
+    final events = values
         .map((value) => _event(_map(value), baseUrl: _client.effectiveBaseUrl))
         .toList();
+    // The events endpoint has no bulk ticket pricing. Enrich only events whose
+    // list response has no usable price, with a small concurrency limit.
+    for (var start = 0; start < events.length; start += 4) {
+      final batch = events.skip(start).take(4).toList();
+      events.replaceRange(
+        start,
+        start + batch.length,
+        await Future.wait(batch.map(_loadStartingPrice)),
+      );
+    }
+    return events;
+  }
+
+  Future<Event> _loadStartingPrice(Event event) async {
+    final id = event.id;
+    if (event.hasPrice || id == null || id.isEmpty) return event;
+    try {
+      final response = await _client.get(
+        ApiEndpoints.ticketTypes(Uri.encodeComponent(id)),
+      );
+      final ticketTypes = _ticketTypes(_listResponse(response, 'ticketTypes'));
+      final startingPrice = _lowestTicketPrice(ticketTypes);
+      if (startingPrice == null) return event;
+      return event.copyWith(price: startingPrice, hasPrice: true);
+    } catch (_) {
+      // A missing price should not prevent the event list from loading.
+      return event;
+    }
   }
 
   Future<Event> details(String id) async {
@@ -28,12 +57,37 @@ class EventApi {
       ApiEndpoints.event(Uri.encodeComponent(id)),
     );
     final data = _objectResponse(response, 'event');
-    return _event(data, baseUrl: _client.effectiveBaseUrl);
+    var event = _event(data, baseUrl: _client.effectiveBaseUrl);
+    if (event.ticketTypes.isEmpty) {
+      try {
+        final ticketResponse = await _client.get(
+          ApiEndpoints.ticketTypes(Uri.encodeComponent(id)),
+        );
+        final ticketTypes = _ticketTypes(
+          _listResponse(ticketResponse, 'ticketTypes'),
+        );
+        final startingPrice = _lowestTicketPrice(ticketTypes);
+        final directPrice = _eventPrice(data);
+        event = event.copyWith(
+          ticketTypes: ticketTypes,
+          price: directPrice ?? startingPrice ?? event.price,
+          hasPrice: directPrice != null || startingPrice != null,
+        );
+      } catch (_) {
+        // Keep event details usable when the ticket-types endpoint is unavailable.
+      }
+    }
+    return event;
   }
 }
 
 Event _event(Map<String, dynamic> data, {required String baseUrl}) {
   final types = data['ticketTypes'] ?? data['ticket_types'] ?? data['tickets'];
+  final directPrice = _eventPrice(data);
+  final ticketTypes = types is List
+      ? _ticketTypes(types)
+      : const <TicketType>[];
+  final startingPrice = _lowestTicketPrice(ticketTypes);
   final startText = _first(data, [
     'startTime',
     'dateTime',
@@ -46,13 +100,7 @@ Event _event(Map<String, dynamic> data, {required String baseUrl}) {
   final parsedStart = DateTime.tryParse(startText);
   final endText = _first(data, ['endTime', 'endDate', 'endsAt', 'ends_at']);
   final parsedEnd = DateTime.tryParse(endText);
-  final cover = _first(data, [
-    'coverImagePath',
-    'imagePath',
-    'image',
-    'cover_image_path',
-  ]);
-  final coverUri = Uri.tryParse(cover);
+  final cover = _eventCover(data, baseUrl);
   return Event(
     id: _first(data, ['id', 'eventId', 'event_id']),
     title: _first(data, ['title', 'name'], fallback: 'Event'),
@@ -66,23 +114,74 @@ Event _event(Map<String, dynamic> data, {required String baseUrl}) {
     endDateTime: parsedEnd,
     venue: _first(data, ['venue', 'venueName']),
     location: _first(data, ['location']),
-    price: _integer(data['minPrice'] ?? data['price']),
-    imagePath: cover.isEmpty || (coverUri?.hasScheme ?? false)
-        ? cover
-        : Uri.parse('$baseUrl/').resolve(cover).toString(),
+    price: directPrice ?? startingPrice ?? 0,
+    hasPrice: directPrice != null || startingPrice != null,
+    imagePath: cover,
+    description: _first(data, ['description']),
     category: _first(data, ['category', 'categoryName']),
     genre: _first(data, ['genre']),
     endTime: endText,
-    ticketTypes: types is List
-        ? types
-              .whereType<Map>()
-              .map((value) => _ticketType(_map(value)))
-              .toList()
-        : const [],
+    ticketTypes: ticketTypes,
     capacity: _integer(data['capacity']),
     availability: _availability(data),
   );
 }
+
+String _eventCover(Map<String, dynamic> data, String baseUrl) {
+  dynamic value;
+  for (final key in const [
+    'coverImagePath',
+    'cover_image_path',
+    'coverImageUrl',
+    'cover_image_url',
+    'imagePath',
+    'image_path',
+    'imageUrl',
+    'image_url',
+    'coverImage',
+    'cover_image',
+    'bannerImagePath',
+    'banner_image_path',
+    'posterUrl',
+    'poster_url',
+    'image',
+  ]) {
+    final candidate = data[key];
+    if (candidate is String && candidate.trim().isNotEmpty) {
+      value = candidate.trim();
+      break;
+    }
+    if (candidate is Map) {
+      for (final nestedKey in const ['url', 'path', 'src', 'href']) {
+        final nested = candidate[nestedKey];
+        if (nested is String && nested.trim().isNotEmpty) {
+          value = nested.trim();
+          break;
+        }
+      }
+      if (value != null) break;
+    }
+  }
+  if (value == null) return '';
+
+  return resolveServerImageUrl(value as String, baseUrl);
+}
+
+List<TicketType> _ticketTypes(List<dynamic> values) => values
+    .whereType<Map>()
+    .where((value) => _priceValue(value['price']) != null)
+    .map((value) => _ticketType(_map(value)))
+    .toList();
+
+int? _lowestTicketPrice(List<TicketType> ticketTypes) {
+  if (ticketTypes.isEmpty) return null;
+  return ticketTypes
+      .map((ticket) => ticket.price)
+      .reduce((lowest, price) => price < lowest ? price : lowest);
+}
+
+int? _eventPrice(Map<String, dynamic> data) =>
+    _priceValue(data['minPrice']) ?? _priceValue(data['price']);
 
 TicketType _ticketType(Map<String, dynamic> data) => TicketType(
   id: _first(data, ['id', 'ticketTypeId', 'ticket_type_id']),
@@ -106,9 +205,11 @@ TicketType _ticketType(Map<String, dynamic> data) => TicketType(
   ], fallback: 'Available'),
 );
 
-
-
 String _availability(Map<String, dynamic> data) {
+  final status = _first(data, ['status']);
+  if (const {'CANCELLED', 'CANCELED'}.contains(status.toUpperCase())) {
+    return status;
+  }
   final explicit = _first(data, ['availability']);
   if (explicit.isNotEmpty) return explicit;
   final legacyStatus = _first(data, ['status'], fallback: 'UNAVAILABLE');
@@ -117,8 +218,13 @@ String _availability(Map<String, dynamic> data) {
       : legacyStatus;
 }
 
-int _integer(dynamic value) =>
-    value is num ? value.toInt() : int.tryParse('$value') ?? 0;
+int _integer(dynamic value) => _priceValue(value) ?? 0;
+int? _priceValue(dynamic value) {
+  final parsed = value is num ? value : num.tryParse('${value ?? ''}');
+  if (parsed == null || !parsed.isFinite || parsed < 0) return null;
+  return parsed.toInt();
+}
+
 int? _nullableInteger(dynamic value) => value == null ? null : _integer(value);
 String _first(
   Map<String, dynamic> data,

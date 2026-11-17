@@ -28,7 +28,9 @@ class Event {
   final String venue;
   final String location;
   final int price;
+  final bool hasPrice;
   final String imagePath;
+  final String description;
   final String category;
   final String genre;
   final String? endTime;
@@ -46,7 +48,9 @@ class Event {
     required this.venue,
     this.location = '',
     required this.price,
+    this.hasPrice = true,
     required this.imagePath,
+    this.description = '',
     required this.category,
     this.genre = '',
     this.endTime,
@@ -57,6 +61,28 @@ class Event {
     String status = 'AVAILABLE',
     String? availability,
   }) : availability = availability ?? status;
+
+  Event copyWith({List<TicketType>? ticketTypes, int? price, bool? hasPrice}) =>
+      Event(
+        id: id,
+        title: title,
+        date: date,
+        time: time,
+        venue: venue,
+        location: location,
+        price: price ?? this.price,
+        hasPrice: hasPrice ?? this.hasPrice,
+        imagePath: imagePath,
+        description: description,
+        category: category,
+        genre: genre,
+        endTime: endTime,
+        startDateTime: startDateTime,
+        endDateTime: endDateTime,
+        ticketTypes: ticketTypes ?? this.ticketTypes,
+        capacity: capacity,
+        availability: availability,
+      );
 
   bool get hasStart =>
       startDateTime != null ||
@@ -90,10 +116,10 @@ class Event {
     return end.isEmpty ? start : '$start - $end';
   }
 
-  String get place => [venue, location]
-      .map((part) => part.trim())
-      .where((part) => part.isNotEmpty)
-      .join(', ');
+  String get place => [
+    venue,
+    location,
+  ].map((part) => part.trim()).where((part) => part.isNotEmpty).join(', ');
 
   String get displayGenre {
     if (genre.trim().isNotEmpty) return genre.trim();
@@ -116,10 +142,11 @@ class Event {
 
   String get status => availability;
 
-  bool get isAvailable =>
-      const {'AVAILABLE', 'PUBLISHED', 'ACTIVE'}.contains(
-        availability.trim().toUpperCase(),
-      );
+  bool get isAvailable => const {
+    'AVAILABLE',
+    'PUBLISHED',
+    'ACTIVE',
+  }.contains(availability.trim().toUpperCase());
 }
 
 bool _looksLikeIsoDate(String value) =>

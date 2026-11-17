@@ -8,13 +8,16 @@ import '../../../features/tickets/logic/tickets_controller.dart';
 import '../../../models/event.dart';
 import '../../../models/ticket.dart';
 import '../../../services/ticket_storage.dart';
+import '../../../core/storage/storage_scope.dart';
 import '../models/order.dart';
 import '../order_rules.dart';
 
 /// Stores orders separately from ticket records in the existing preferences store.
 class OrderRepository {
   static final Map<String, Future<void>> _orderLocks = {};
-  static const _ordersKey = 'ticket_master_orders';
+  static const _ordersPrefix = 'ticket_master_orders';
+  static const _legacyOrdersKey = 'ticket_master_orders';
+  static const _orderMigrationKey = 'ticket_orders_scope_v1';
   final Random _random;
   final TicketStorage _ticketStorage;
 
@@ -22,9 +25,19 @@ class OrderRepository {
     : _random = random ?? Random(),
       _ticketStorage = ticketStorage ?? TicketStorage();
 
-  Future<List<Order>> _readOrders() async {
+  static Future<void> migrateLegacyOrders() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_ordersKey);
+    if (prefs.getBool(_orderMigrationKey) ?? false) return;
+    await prefs.remove(_legacyOrdersKey);
+    await prefs.remove('pending_payment_order_id');
+    await prefs.setBool(_orderMigrationKey, true);
+  }
+
+  Future<List<Order>> _readOrders({String? userId}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = StorageScope.key(_ordersPrefix, userId: userId);
+    if (key == null) return [];
+    final raw = prefs.getString(key);
     if (raw == null) return [];
     final decoded = jsonDecode(raw);
     if (decoded is! List) return [];
@@ -34,38 +47,49 @@ class OrderRepository {
         .toList();
   }
 
-  Future<void> _writeOrders(List<Order> orders) async {
+  Future<void> _writeOrders(List<Order> orders, {String? userId}) async {
     final prefs = await SharedPreferences.getInstance();
+    final key = StorageScope.key(_ordersPrefix, userId: userId);
+    if (key == null) return;
     await prefs.setString(
-      _ordersKey,
+      key,
       jsonEncode(orders.map((order) => order.toJson()).toList()),
     );
   }
 
   /// Adds or replaces a locally stored order.
   Future<void> saveOrder(Order order) async {
-    final orders = await _readOrders();
+    if (order.userId.isEmpty) throw StateError('Order owner is required.');
+    final orders = await _readOrders(userId: order.userId);
     final index = orders.indexWhere((saved) => saved.id == order.id);
     if (index < 0) {
       orders.add(order);
     } else {
       orders[index] = order;
     }
-    await _writeOrders(orders);
+    await _writeOrders(orders, userId: order.userId);
   }
 
   /// Updates the status of an existing order.
-  Future<void> updateOrderStatus(String orderId, String status) async {
-    final orders = await _readOrders();
+  Future<void> updateOrderStatus(
+    String orderId,
+    String status, {
+    String? userId,
+  }) async {
+    final scope = userId ?? StorageScope.currentKey();
+    if (scope == null) throw StateError('A logged-in customer is required.');
+    final orders = await _readOrders(userId: scope);
     final index = orders.indexWhere((order) => order.id == orderId);
     if (index < 0) throw StateError('Order could not be found.');
     orders[index] = orders[index].copyWith(status: status);
-    await _writeOrders(orders);
+    await _writeOrders(orders, userId: scope);
   }
 
   /// Returns only orders belonging to the requested customer.
   Future<List<Order>> getOrdersForUser(String userId) async =>
-      (await _readOrders()).where((order) => order.userId == userId).toList();
+      (await _readOrders(userId: userId))
+          .where((order) => order.userId == userId)
+          .toList();
 
   /// Creates each purchased ticket once, only when its order can be marked paid.
   Future<List<Ticket>> completePaidOrder({
@@ -127,13 +151,13 @@ class OrderRepository {
         'Order must contain exactly one ticket type and ticket.',
       );
     }
-    final orders = await _readOrders();
+    final orders = await _readOrders(userId: order.userId);
     final index = orders.indexWhere((saved) => saved.id == order.id);
     if (index < 0) throw StateError('Order could not be found.');
     if (orders[index].status == 'paid') return [];
 
     final tickets = <Ticket>[];
-    final ids = (await _ticketStorage.getSavedTickets())
+    final ids = (await _ticketStorage.getSavedTickets(userId: order.userId))
         .map((ticket) => ticket.id)
         .toSet();
     for (final item in order.items) {
@@ -165,7 +189,7 @@ class OrderRepository {
     }
     await ticketsController.addTickets(tickets);
     orders[index] = orders[index].copyWith(status: 'paid');
-    await _writeOrders(orders);
+    await _writeOrders(orders, userId: order.userId);
     return tickets;
   }
 

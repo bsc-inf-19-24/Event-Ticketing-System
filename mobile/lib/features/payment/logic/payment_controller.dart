@@ -1,7 +1,8 @@
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../../core/storage/pending_checkout_store.dart';
 
 import '../../../core/api_client.dart';
 import '../../../features/auth/logic/auth_controller.dart';
@@ -25,17 +26,24 @@ class PaymentController extends ChangeNotifier {
     TicketsController? ticketsController,
     AuthController? auth,
     Random? random,
+    bool? useMockPayment,
   }) : _paymentService = paymentService ?? paymentServiceGlobal,
        _orderRepository = orderRepository ?? OrderRepository(),
        _ticketsController = ticketsController ?? ticketsControllerGlobal,
        _auth = auth ?? authController,
-       _random = random ?? Random();
+       _random = random ?? Random(),
+       _useMockPayment = useMockPayment ?? useFakePayment {
+    _boundUserId = _auth.stableUserId;
+    _auth.addListener(_onAuthChanged);
+  }
 
   final PaymentService _paymentService;
   final OrderRepository _orderRepository;
   final TicketsController _ticketsController;
   final AuthController _auth;
   final Random _random;
+  final bool _useMockPayment;
+  String? _boundUserId;
   Order? order;
   CheckoutSession? checkoutSession;
   bool isProcessing = false;
@@ -48,9 +56,30 @@ class PaymentController extends ChangeNotifier {
   bool _beginInFlight = false;
   bool _pendingVerification = false;
   bool get isPendingVerification => _pendingVerification;
-  static const pendingOrderPreference = 'pending_payment_order_id';
+  final PendingCheckoutStore _pendingStore = PendingCheckoutStore();
   String? _paymentState;
   String? get paymentState => _paymentState;
+
+  void _onAuthChanged() {
+    final currentId = _auth.stableUserId;
+    if (currentId == _boundUserId) return;
+    final previousId = _boundUserId;
+    _boundUserId = currentId;
+    if (previousId != null) _pendingStore.clear(userId: previousId);
+    order = null;
+    checkoutSession = null;
+    purchasedTickets = const [];
+    _pendingVerification = false;
+    _pendingIdempotencyKey = null;
+    _pendingOrderFingerprint = null;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _auth.removeListener(_onAuthChanged);
+    super.dispose();
+  }
 
   /// Creates an order and starts the selected test or backend payment flow.
   Future<void> begin({
@@ -135,7 +164,11 @@ class PaymentController extends ChangeNotifier {
       }
     } catch (error) {
       if (order != null && service is! ApiPaymentService) {
-        await _orderRepository.updateOrderStatus(order!.id, 'failed');
+        await _orderRepository.updateOrderStatus(
+          order!.id,
+          'failed',
+          userId: order!.userId,
+        );
       }
       rethrow;
     } finally {
@@ -207,12 +240,56 @@ class PaymentController extends ChangeNotifier {
       createdAt: now,
     );
     order = createdOrder;
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(pendingOrderPreference, orderId);
+    await _pendingStore.save(orderId, userId: _auth.stableUserId);
     await _orderRepository.saveOrder(createdOrder);
+
+    if (_useMockPayment) {
+      final mockResult = await service.createMockPayment(
+        orderId: orderId,
+        amount: serverTotal,
+      );
+      final payment = _nestedMap(mockResult['payment']);
+      final status = _firstString([
+        mockResult['paymentStatus'],
+        mockResult['payment_status'],
+        payment['status'],
+        mockResult['status'],
+      ]).toUpperCase();
+      if (_isPaidStatus(status)) {
+        final paid = await _finishServerOrder(service, createdOrder);
+        if (paid) _clearIdempotencyState();
+      } else if (const {
+        'FAILED',
+        'FAILURE',
+        'CANCELLED',
+        'CANCELED',
+      }.contains(status)) {
+        _paymentState = 'failed';
+        _pendingVerification = false;
+        failureReason = _firstString([
+          mockResult['message'],
+          mockResult['error'],
+        ], fallback: 'The mock payment was not successful.');
+        await _pendingStore.clear(userId: _auth.stableUserId);
+        await _orderRepository.updateOrderStatus(
+          orderId,
+          'failed',
+          userId: createdOrder.userId,
+        );
+        order = createdOrder.copyWith(status: 'failed');
+      } else {
+        _paymentState = 'pending';
+        _pendingVerification = true;
+        failureReason = _firstString([
+          mockResult['message'],
+        ], fallback: 'Payment is pending. Verify the order to continue.');
+      }
+      return;
+    }
 
     final session = await service.initiateOrderPayment(
       orderId: orderId,
+      amount: serverTotal,
       method: method,
       phone: '',
     );
@@ -324,7 +401,6 @@ class PaymentController extends ChangeNotifier {
     Order currentOrder,
   ) async {
     final verification = await service.verifyOrder(currentOrder.id);
-    final preferences = await SharedPreferences.getInstance();
     final remoteOrder = _nestedMap(verification['order']);
     final payment = _nestedMap(verification['payment']);
     final status = _firstString([
@@ -339,7 +415,7 @@ class PaymentController extends ChangeNotifier {
       payment['status'],
       verification['status'],
     ]).toUpperCase();
-    if (status == 'PAID' && paymentStatus == 'PAID') {
+    if (_isPaidStatus(status) && _isPaidStatus(paymentStatus)) {
       purchasedTickets = await _readIssuedTickets(
         service,
         remoteOrder,
@@ -350,19 +426,39 @@ class PaymentController extends ChangeNotifier {
           'Payment is confirmed, but the server has not returned the issued tickets yet.',
         );
       }
-      await preferences.remove(pendingOrderPreference);
+      await _orderRepository.updateOrderStatus(
+        currentOrder.id,
+        'paid',
+        userId: currentOrder.userId,
+      );
+      order = currentOrder.copyWith(status: 'paid');
+      _paymentState = 'paid';
+      _pendingVerification = false;
+      await _pendingStore.clear(userId: _auth.stableUserId);
       return true;
     }
-    if (status == 'FAILED' || paymentStatus == 'FAILED') {
+    if (const {'FAILED', 'FAILURE', 'CANCELLED', 'CANCELED'}.contains(status) ||
+        const {
+          'FAILED',
+          'FAILURE',
+          'CANCELLED',
+          'CANCELED',
+        }.contains(paymentStatus)) {
       _paymentState = 'failed';
       _pendingVerification = false;
-      await preferences.remove(pendingOrderPreference);
+      await _orderRepository.updateOrderStatus(
+        currentOrder.id,
+        'failed',
+        userId: currentOrder.userId,
+      );
+      order = currentOrder.copyWith(status: 'failed');
+      await _pendingStore.clear(userId: _auth.stableUserId);
       failureReason = 'The server could not confirm this payment.';
       return false;
     }
     _paymentState = 'pending';
     _pendingVerification = true;
-    await preferences.setString(pendingOrderPreference, currentOrder.id);
+    await _pendingStore.save(currentOrder.id, userId: _auth.stableUserId);
     failureReason = 'Payment is still pending. Recheck when ready.';
     return false;
   }
@@ -444,14 +540,20 @@ class PaymentController extends ChangeNotifier {
     return 0;
   }
 
+  bool _isPaidStatus(String status) => const {
+    'PAID',
+    'SUCCESS',
+    'SUCCESSFUL',
+    'COMPLETED',
+    'SETTLED',
+  }.contains(status);
+
   void _clearIdempotencyState() {
     _pendingIdempotencyKey = null;
     _pendingOrderFingerprint = null;
     _pendingVerification = false;
     _paymentState = 'paid';
-    SharedPreferences.getInstance().then(
-      (preferences) => preferences.remove(pendingOrderPreference),
-    );
+    _pendingStore.clear(userId: _auth.stableUserId);
   }
 
   Future<void> _updateOrderStatus(
@@ -460,7 +562,11 @@ class PaymentController extends ChangeNotifier {
     String persistenceFailureMessage,
   ) async {
     try {
-      await _orderRepository.updateOrderStatus(orderId, status);
+      await _orderRepository.updateOrderStatus(
+        orderId,
+        status,
+        userId: _auth.stableUserId,
+      );
     } catch (_) {
       failureReason = persistenceFailureMessage;
     }

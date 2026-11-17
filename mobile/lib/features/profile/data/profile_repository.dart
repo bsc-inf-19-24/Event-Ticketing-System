@@ -1,5 +1,7 @@
 import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/core/storage/secure_storage.dart';
+import 'package:mobile/features/auth/logic/auth_controller.dart';
+import 'package:mobile/features/auth/models/app_user.dart';
 
 class ProfileRepository {
   ProfileRepository({ApiClient? apiClient, SecureStorageService? storage})
@@ -10,8 +12,30 @@ class ProfileRepository {
   final SecureStorageService _storage;
 
   Future<Map<String, dynamic>> fetchUserProfile() async {
+    final requestingUserId = authController.stableUserId;
     final response = await _apiClient.get('/api/customers/me');
-    return _asMap(response);
+    final profile = _asMap(response);
+    final nested = profile['user'] ?? profile['customer'] ?? profile['profile'];
+    final data = nested is Map ? Map<String, dynamic>.from(nested) : profile;
+    final current = authController.user;
+    if (current != null && requestingUserId == authController.stableUserId) {
+      final email = (data['email'] ?? current.email).toString();
+      final name =
+          (data['name'] ??
+                  data['fullName'] ??
+                  data['full_name'] ??
+                  current.name)
+              .toString();
+      final updated = AppUser(
+        id: current.id,
+        name: name,
+        email: email,
+        role: current.role,
+      );
+      await _storage.saveUser(updated);
+      authController.setAuthenticatedUser(updated);
+    }
+    return data;
   }
 
   Future<Map<String, dynamic>> updateUserProfile(

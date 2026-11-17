@@ -11,11 +11,8 @@ class EventCard extends StatelessWidget {
 
   const EventCard({super.key, required this.event, this.onTap});
 
-  Widget _eventImage(double width) => EventImage(
-    imagePath: event.imagePath,
-    width: width,
-    height: 200,
-  );
+  Widget _eventImage(double width) =>
+      EventImage(imagePath: event.imagePath, width: width, height: 200);
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +61,7 @@ class EventCard extends StatelessWidget {
                               if (event.hasStart) ...[
                                 Text(
                                   event.displayDate,
-                                  maxLines: 1,
+                                  maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 Text(
@@ -82,7 +79,7 @@ class EventCard extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          event.ticketTypes.isEmpty
+                          !event.hasPrice
                               ? 'Price: TBA'
                               : event.price == 0
                               ? 'Price: Free'

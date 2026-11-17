@@ -9,13 +9,15 @@ import 'package:mobile/features/auth/domain/usecases/password_reset_usecase.dart
 import 'package:mobile/features/auth/domain/usecases/register_usecase.dart';
 import 'package:mobile/features/auth/logic/auth_controller.dart';
 import 'package:mobile/features/auth/models/app_user.dart';
+import 'package:mobile/core/storage/secure_storage.dart';
+import 'package:mobile/core/storage/pending_checkout_store.dart';
+import 'package:mobile/features/tickets/logic/tickets_controller.dart';
 
 // The first argument is the NAME of a --dart-define variable.
 // The actual client ID goes in defaultValue.
 const _googleClientId = String.fromEnvironment(
   'GOOGLE_CLIENT_ID',
-  defaultValue:
-  '837271104289-k5fgkt8bu19vasi84c49tg5ioi09pkla.apps.googleusercontent.com',
+  defaultValue: '837271104289-k5fgkt8bu19vasi84c49tg5ioi09pkla.apps.googleusercontent.com',
 );
 
 Future<void>? _googleSignInInitialization;
@@ -27,9 +29,9 @@ class AuthProvider extends ChangeNotifier {
     RegisterUseCase? registerUseCase,
     AuthRepository? authRepository,
   }) : registerUseCase =
-      registerUseCase ??
-          RegisterUseCase(repository: loginUseCase.repository),
-        authRepository = authRepository ?? loginUseCase.repository;
+           registerUseCase ??
+           RegisterUseCase(repository: loginUseCase.repository),
+       authRepository = authRepository ?? loginUseCase.repository;
 
   final LoginUseCase loginUseCase;
   final RegisterUseCase registerUseCase;
@@ -46,16 +48,17 @@ class AuthProvider extends ChangeNotifier {
   String? get sessionRestoreError => _sessionRestoreError;
   bool get isLoggedIn => authController.isLoggedIn;
 
-  void _setAuthenticatedUser(User user) {
-    authController.setAuthenticatedUser(
-      AppUser(
-        id: user.id,
-        name: user.name?.trim().isNotEmpty == true
-            ? user.name!.trim()
-            : user.email.split('@').first,
-        email: user.email,
-      ),
+  Future<void> _setAuthenticatedUser(User user) async {
+    final appUser = AppUser(
+      id: user.id,
+      name: user.name?.trim().isNotEmpty == true
+          ? user.name!.trim()
+          : user.email.split('@').first,
+      email: user.email,
+      role: user.role,
     );
+    await SecureStorageService().saveUser(appUser);
+    authController.setAuthenticatedUser(appUser);
   }
 
   String _messageFrom(Object error) =>
@@ -67,7 +70,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     try {
       final user = await authRepository.restoreSession();
-      if (user != null) _setAuthenticatedUser(user);
+      if (user != null) await _setAuthenticatedUser(user);
     } catch (error) {
       _sessionRestoreError = _messageFrom(error);
     } finally {
@@ -88,11 +91,11 @@ class AuthProvider extends ChangeNotifier {
       password: password,
       role: role,
     );
-    _setAuthenticatedUser(user);
+    await _setAuthenticatedUser(user);
   });
 
   Future<bool> login(String email, String password) => _runAuth(() async {
-    _setAuthenticatedUser(await loginUseCase.execute(email, password));
+    await _setAuthenticatedUser(await loginUseCase.execute(email, password));
   });
 
   Future<bool> loginWithGoogle() => _runAuth(() async {
@@ -110,7 +113,7 @@ class AuthProvider extends ChangeNotifier {
         'Google did not return an ID token. Check your OAuth client configuration.',
       );
     }
-    _setAuthenticatedUser(await authRepository.loginWithGoogle(idToken));
+    await _setAuthenticatedUser(await authRepository.loginWithGoogle(idToken));
   });
 
   Future<bool> _runAuth(Future<void> Function() action) async {
@@ -171,7 +174,10 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    final userId = authController.stableUserId;
+    await PendingCheckoutStore().clear(userId: userId);
     await authRepository.logout();
+    ticketsController.clear();
     authController.logOut();
     notifyListeners();
   }

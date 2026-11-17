@@ -5,9 +5,21 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mobile/core/api_client.dart';
 import 'package:mobile/features/auth/data/datasources/auth_remote_datasource.dart';
+import 'package:mobile/features/auth/data/model/user_model.dart';
 import 'package:mobile/features/profile/data/profile_repository.dart';
 
 void main() {
+  test(
+    'uses the JWT subject as an email fallback when no user is returned',
+    () {
+      final payload = base64Url
+          .encode(utf8.encode('{"sub":"token@example.com"}'))
+          .replaceAll('=', '');
+      final user = UserModel.fromJson({'token': 'header.$payload.signature'});
+      expect(user.email, 'token@example.com');
+    },
+  );
+
   test(
     'registration sends the role and parses the returned token pair',
     () async {
@@ -56,9 +68,13 @@ void main() {
         request = incoming;
         return http.Response(
           jsonEncode({
-            'id': 'customer-1',
-            'name': 'Alex Customer',
-            'email': 'alex@example.com',
+            'data': {
+              'customer': {
+                'id': 'customer-1',
+                'name': 'Alex Customer',
+                'email': 'alex@example.com',
+              },
+            },
           }),
           200,
         );

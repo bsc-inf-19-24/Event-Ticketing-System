@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../models/ticket.dart';
+import '../core/storage/storage_scope.dart';
 import 'ticket_database_factory.dart'
     if (dart.library.html) 'ticket_database_factory_web.dart';
 
@@ -13,8 +14,9 @@ class TicketStorage {
   TicketStorage({this.databasePath, this.databaseName = 'tickets.db'});
 
   static const _legacyStorageKey = 'saved_demo_tickets';
-  static const _legacyMigrationKey = 'saved_tickets_sqlite_migrated';
-  static const _webStorageKey = 'saved_tickets_web';
+  static const _legacyMigrationKey = 'ticket_legacy_cleanup_v2';
+  static const _legacyWebStorageKey = 'saved_tickets_web';
+  static const _webStoragePrefix = 'saved_tickets_web';
   static const _syncKey = 'saved_tickets_last_synced';
   static const _ticketTable = 'tickets';
   static const _syncTable = 'ticket_sync';
@@ -39,6 +41,38 @@ class TicketStorage {
       if (identical(_databases[file], opening)) _databases.remove(file);
       rethrow;
     }
+  }
+
+  Future<void> migrateLegacyRecords() async {
+    if (kIsWeb) {
+      final preferences = await SharedPreferences.getInstance();
+      if (preferences.getBool(_legacyMigrationKey) ?? false) return;
+      var removed = 0;
+      final raw = preferences.getString(_legacyStorageKey);
+      if (raw != null) {
+        try {
+          final decoded = jsonDecode(raw);
+          if (decoded is List) removed += decoded.length;
+        } on FormatException {
+          // Discard malformed legacy storage during the one-time cleanup.
+        }
+        await preferences.remove(_legacyStorageKey);
+      }
+      final legacyWebJson = preferences.getString(_legacyWebStorageKey);
+      if (legacyWebJson != null) {
+        try {
+          final decoded = jsonDecode(legacyWebJson);
+          if (decoded is List) removed += decoded.length;
+        } on FormatException {
+          // Discard malformed globally scoped web ticket data.
+        }
+        await preferences.remove(_legacyWebStorageKey);
+      }
+      await preferences.setBool(_legacyMigrationKey, true);
+      if (kDebugMode) debugPrint('Removed $removed legacy ticket records.');
+      return;
+    }
+    await _migrateLegacyTickets(await _db);
   }
 
   Future<Database> _openDatabase(String file) async {
@@ -104,53 +138,59 @@ class TicketStorage {
   Future<void> _migrateLegacyTickets(Database database) async {
     final preferences = await SharedPreferences.getInstance();
     if (preferences.getBool(_legacyMigrationKey) ?? false) return;
-
+    var removed = 0;
     final legacyJson = preferences.getString(_legacyStorageKey);
     if (legacyJson != null) {
-      final decoded = jsonDecode(legacyJson);
-      if (decoded is! List) {
-        throw const FormatException('Saved ticket data is invalid.');
+      try {
+        final decoded = jsonDecode(legacyJson);
+        if (decoded is List) removed += decoded.length;
+      } on FormatException {
+        // Discard malformed legacy storage during the one-time cleanup.
       }
-      final tickets = decoded
-          .whereType<Map>()
-          .map((item) => Ticket.fromJson(Map<String, dynamic>.from(item)))
-          .toList();
-      await database.transaction((transaction) async {
-        for (final ticket in tickets) {
-          await transaction.insert(
-            _ticketTable,
-            _ticketRow(ticket, DateTime.now().toIso8601String()),
-            conflictAlgorithm: ConflictAlgorithm.ignore,
-          );
-        }
-      });
+      await preferences.remove(_legacyStorageKey);
     }
+    final rows = await database.query(_ticketTable);
+    for (final row in rows) {
+      final ticket = _ticketFromRow(row);
+      if ((row['user_id']?.toString().isEmpty ?? true) || _isLegacy(ticket)) {
+        removed += await database.delete(
+          _ticketTable,
+          where: 'user_id = ? AND ticket_id = ?',
+          whereArgs: [row['user_id'], row['ticket_id']],
+        );
+      }
+    }
+    if (kDebugMode) debugPrint('Removed $removed legacy ticket records.');
     final migrated = await preferences.setBool(_legacyMigrationKey, true);
     if (!migrated) throw StateError('Could not migrate saved tickets.');
   }
 
   Future<List<Ticket>> getSavedTickets({String? userId}) async {
+    final scope = userId ?? StorageScope.currentKey();
+    if (scope == null) return const [];
     if (kIsWeb) {
-      final tickets = await _readWebTickets();
-      return userId == null
-          ? tickets
-          : tickets.where((ticket) => ticket.userId == userId).toList();
+      final tickets = await _readWebTickets(scope);
+      return tickets
+          .where((ticket) => ticket.userId == scope && !_isLegacy(ticket))
+          .toList();
     }
 
     final rows = await (await _db).query(
       _ticketTable,
-      where: userId == null ? null : 'user_id = ?',
-      whereArgs: userId == null ? null : [userId],
+      where: 'user_id = ?',
+      whereArgs: [scope],
       orderBy: 'updated_at ASC',
     );
     return rows.map(_ticketFromRow).toList();
   }
 
   Future<Ticket?> getTicket(String id, {String? userId}) async {
+    final scope = userId ?? StorageScope.currentKey();
+    if (scope == null) return null;
     if (kIsWeb) {
-      final tickets = await _readWebTickets();
+      final tickets = await _readWebTickets(scope);
       for (final ticket in tickets) {
-        if (ticket.id == id && (userId == null || ticket.userId == userId)) {
+        if (ticket.id == id && ticket.userId == scope) {
           return ticket;
         }
       }
@@ -159,8 +199,8 @@ class TicketStorage {
 
     final rows = await (await _db).query(
       _ticketTable,
-      where: userId == null ? 'ticket_id = ?' : 'ticket_id = ? AND user_id = ?',
-      whereArgs: userId == null ? [id] : [id, userId],
+      where: 'ticket_id = ? AND user_id = ?',
+      whereArgs: [id, scope],
       limit: 1,
     );
     return rows.isEmpty ? null : _ticketFromRow(rows.first);
@@ -168,14 +208,15 @@ class TicketStorage {
 
   Future<void> saveTicket(Ticket ticket) async {
     _validateTickets([ticket]);
+    if (ticket.userId.isEmpty) throw StateError('Ticket owner is required.');
     final prepared = ticket.downloadedAt.isEmpty
         ? ticket.copyWith(downloadedAt: DateTime.now().toIso8601String())
         : ticket;
 
     if (kIsWeb) {
-      final tickets = await _readWebTickets();
+      final tickets = await _readWebTickets(ticket.userId);
       if (tickets.any((saved) => _key(saved) == _key(prepared))) return;
-      await _writeWebTickets([...tickets, prepared]);
+      await _writeWebTickets([...tickets, prepared], userId: ticket.userId);
       return;
     }
 
@@ -189,6 +230,9 @@ class TicketStorage {
   Future<void> saveTickets(List<Ticket> tickets) async {
     if (tickets.isEmpty) return;
     _validateTickets(tickets);
+    if (tickets.any((ticket) => ticket.userId.isEmpty)) {
+      throw StateError('Ticket owners are required.');
+    }
     final now = DateTime.now().toIso8601String();
     final prepared = tickets
         .map(
@@ -199,12 +243,18 @@ class TicketStorage {
         .toList();
 
     if (kIsWeb) {
-      final existing = await _readWebTickets();
-      final byKey = {for (final ticket in existing) _key(ticket): ticket};
+      final byUser = <String, List<Ticket>>{};
       for (final ticket in prepared) {
-        byKey[_key(ticket)] = ticket;
+        byUser.putIfAbsent(ticket.userId, () => []).add(ticket);
       }
-      await _writeWebTickets(byKey.values.toList());
+      for (final entry in byUser.entries) {
+        final existing = await _readWebTickets(entry.key);
+        final byKey = {for (final ticket in existing) _key(ticket): ticket};
+        for (final ticket in entry.value) {
+          byKey[_key(ticket)] = ticket;
+        }
+        await _writeWebTickets(byKey.values.toList(), userId: entry.key);
+      }
       return;
     }
 
@@ -225,11 +275,12 @@ class TicketStorage {
     final updated = ticket.copyWith(downloadedAt: existing.downloadedAt);
 
     if (kIsWeb) {
-      final tickets = await _readWebTickets();
+      final tickets = await _readWebTickets(updated.userId);
       await _writeWebTickets(
         tickets
             .map((saved) => _key(saved) == _key(updated) ? updated : saved)
             .toList(),
+        userId: updated.userId,
       );
       return;
     }
@@ -250,17 +301,14 @@ class TicketStorage {
     if (remoteTickets.any((ticket) => ticket.userId != userId)) {
       throw StateError('Cannot cache tickets owned by another user.');
     }
+    if (remoteTickets.isEmpty) return;
     final now = DateTime.now().toIso8601String();
     final uniqueTickets = <String, Ticket>{
       for (final ticket in remoteTickets) ticket.id: ticket,
     }.values.toList();
 
     if (kIsWeb) {
-      final existing = await _readWebTickets();
-      await _writeWebTickets([
-        ...existing.where((ticket) => ticket.userId != userId),
-        ...uniqueTickets,
-      ]);
+      await _writeWebTickets(uniqueTickets, userId: userId);
     } else {
       final database = await _db;
       await database.transaction((transaction) async {
@@ -290,7 +338,7 @@ class TicketStorage {
 
   Future<void> refreshSavedTickets(List<Ticket> remoteTickets) async {
     if (remoteTickets.isEmpty) return;
-    final saved = await getSavedTickets();
+    final saved = await getSavedTickets(userId: StorageScope.currentKey());
     final byKey = {for (final ticket in remoteTickets) _key(ticket): ticket};
     final updated = saved.map((ticket) {
       final remote = byKey[_key(ticket)];
@@ -322,21 +370,23 @@ class TicketStorage {
   }
 
   Future<void> deleteTicket(String id, {String? userId}) async {
+    final scope = userId ?? StorageScope.currentKey();
+    if (scope == null) return;
     if (kIsWeb) {
-      final tickets = await _readWebTickets();
+      final tickets = await _readWebTickets(scope);
       await _writeWebTickets(
-        tickets.where((ticket) {
-          final matchesTicket = ticket.id == id;
-          return !matchesTicket || (userId != null && ticket.userId != userId);
-        }).toList(),
+        tickets
+            .where((ticket) => ticket.id != id || ticket.userId != scope)
+            .toList(),
+        userId: scope,
       );
       return;
     }
 
     await (await _db).delete(
       _ticketTable,
-      where: userId == null ? 'ticket_id = ?' : 'ticket_id = ? AND user_id = ?',
-      whereArgs: userId == null ? [id] : [id, userId],
+      where: 'ticket_id = ? AND user_id = ?',
+      whereArgs: [id, scope],
     );
   }
 
@@ -352,6 +402,12 @@ class TicketStorage {
     _databaseKey = null;
   }
 
+  bool _isLegacy(Ticket ticket) =>
+      ticket.id.startsWith('TKT-') ||
+      ticket.id.startsWith('TM-') ||
+      ticket.source == 'demo-local' ||
+      ticket.source == 'fake';
+
   Map<String, Object?> _ticketRow(Ticket ticket, String timestamp) => {
     'user_id': ticket.userId,
     'ticket_id': ticket.id,
@@ -365,9 +421,10 @@ class TicketStorage {
     return ticket.copyWith(userId: row['user_id']! as String);
   }
 
-  Future<List<Ticket>> _readWebTickets() async {
+  Future<List<Ticket>> _readWebTickets(String userId) async {
     final preferences = await SharedPreferences.getInstance();
-    final raw = preferences.getString(_webStorageKey);
+    final key = StorageScope.key(_webStoragePrefix, userId: userId)!;
+    final raw = preferences.getString(key);
     if (raw == null) return [];
     final decoded = jsonDecode(raw);
     if (decoded is! List) {
@@ -379,10 +436,14 @@ class TicketStorage {
         .toList();
   }
 
-  Future<void> _writeWebTickets(List<Ticket> tickets) async {
+  Future<void> _writeWebTickets(
+    List<Ticket> tickets, {
+    required String userId,
+  }) async {
     final preferences = await SharedPreferences.getInstance();
+    final key = StorageScope.key(_webStoragePrefix, userId: userId)!;
     final saved = await preferences.setString(
-      _webStorageKey,
+      key,
       jsonEncode(tickets.map((ticket) => ticket.toJson()).toList()),
     );
     if (!saved) throw StateError('Could not save tickets on this device.');

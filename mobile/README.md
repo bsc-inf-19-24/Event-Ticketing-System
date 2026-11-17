@@ -99,11 +99,11 @@ the Docker backend, start the container and select **Ticket Master - Real API
 first run:
 
 ```sh
-adb reverse tcp:8081 tcp:8081
+adb reverse tcp:8082 tcp:8082
 ```
 
 The USB-device launch profile and app server setting use
-`http://localhost:8081`. The API is published on host port `8081` so the
+`http://localhost:8082`. The API is published on host port `8082` so the
 physical device reaches the API service instead of the other service using
 port `8080`.
 

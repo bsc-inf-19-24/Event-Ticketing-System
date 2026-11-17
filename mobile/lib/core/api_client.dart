@@ -222,13 +222,26 @@ class ApiClient {
       return responseData;
     }
 
-    final serverMessage = responseData is Map
-        ? responseData['message'] ?? responseData['error']
-        : null;
-    final message = serverMessage is String && serverMessage.trim().isNotEmpty
-        ? serverMessage
-        : _messageForStatusCode(response.statusCode);
+    final message =
+        _serverMessage(responseData) ??
+        _messageForStatusCode(response.statusCode);
     throw ApiException(message, response.statusCode);
+  }
+
+  String? _serverMessage(dynamic value) {
+    if (value is! Map) return null;
+    final map = Map<String, dynamic>.from(value);
+    for (final key in const ['message', 'error', 'detail']) {
+      final candidate = map[key];
+      if (candidate is String && candidate.trim().isNotEmpty) {
+        return candidate.trim();
+      }
+      if (candidate is Map) {
+        final nested = _serverMessage(candidate);
+        if (nested != null) return nested;
+      }
+    }
+    return _serverMessage(map['data']);
   }
 
   String _messageForStatusCode(int statusCode) => switch (statusCode) {

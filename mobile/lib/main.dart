@@ -6,20 +6,27 @@ import 'package:provider/provider.dart';
 import 'core/api_client.dart';
 import 'core/api_config.dart';
 import 'core/storage/secure_storage.dart';
+import 'core/storage/pending_checkout_store.dart';
+import 'services/ticket_storage.dart';
 import 'features/auth/data/datasources/auth_remote_datasource.dart';
 import 'features/auth/data/datasources/mock_auth_remote_datasource.dart';
 import 'features/auth/data/presentation/provider/auth_provider.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
+import 'features/orders/services/order_repository.dart';
 import 'features/auth/domain/repositories/auth_repository.dart';
 import 'features/auth/domain/usecases/login_usecase.dart';
 import 'features/auth/domain/usecases/password_reset_usecase.dart';
 import 'features/auth/domain/usecases/register_usecase.dart';
 import 'features/auth/logic/auth_controller.dart';
+import 'features/auth/models/app_user.dart';
 import 'features/tickets/logic/connectivity_monitor.dart';
+import 'features/tickets/logic/tickets_controller.dart';
 import 'screens/main_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await TicketStorage().migrateLegacyRecords();
+  await OrderRepository.migrateLegacyOrders();
   await ApiConfig.load();
   await connectivityMonitor.start();
 
@@ -41,10 +48,23 @@ Future<void> main() async {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
       );
+      final refreshedUser = tokens.user;
+      if (refreshedUser != null && refreshedUser.email.isNotEmpty) {
+        final appUser = AppUser(
+          id: refreshedUser.id,
+          name: refreshedUser.name ?? '',
+          email: refreshedUser.email,
+          role: refreshedUser.role,
+        );
+        await secureStorage.saveUser(appUser);
+        authController.setAuthenticatedUser(appUser);
+      }
       return tokens.accessToken;
     };
     apiClient.onUnauthorized = () async {
+      await PendingCheckoutStore().clear(userId: authController.stableUserId);
       await secureStorage.clearTokens();
+      ticketsController.clear();
       authController.logOut();
     };
   }

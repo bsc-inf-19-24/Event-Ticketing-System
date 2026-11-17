@@ -18,6 +18,7 @@ class ApiEndpoints {
       '$orders/${Uri.encodeComponent(orderId)}/payment';
 
   static const paymentCheckout = '/api/payments/checkout'; // body {orderId}
+  static const payments = '/api/payments';
   static const paymentVerify = '/api/payments/verify'; // body {orderId}
   static String demoMarkPaid(String orderId) =>
       '/api/dev/orders/${Uri.encodeComponent(orderId)}/mark-paid';

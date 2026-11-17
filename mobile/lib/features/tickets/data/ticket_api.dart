@@ -23,24 +23,23 @@ class TicketApi {
     final qrPayloads = <String>{};
 
     for (final value in values) {
+      final ticketData = _ticketMap(value);
+      final ownerId = ticketOwnerIdFromJson(ticketData);
+      if (ownerId == null || ownerId != authenticatedUserId) continue;
       final ticket = _parseTicket(
-        _ticketMap(value),
+        ticketData,
         authenticatedUserId: authenticatedUserId,
       );
       if (ticket.id.isEmpty) {
         throw ApiException('The server returned a ticket without an ID.');
       }
-      if (ticket.userId != authenticatedUserId) {
-        throw ApiException(
-          'The server returned a ticket belonging to another account.',
-        );
-      }
+      if (ticket.userId != authenticatedUserId) continue;
       if (!ticket.isIssued) continue;
-      if (ticket.qrPayload.isNotEmpty &&
-          !qrPayloads.add(ticket.qrPayload)) {
+      if (!ids.add(ticket.id)) continue;
+      if (ticket.qrPayload.isNotEmpty && !qrPayloads.add(ticket.qrPayload)) {
         throw ApiException('The server returned duplicate ticket QR data.');
       }
-      if (ids.add(ticket.id)) tickets.add(ticket);
+      tickets.add(ticket);
     }
 
     return tickets;

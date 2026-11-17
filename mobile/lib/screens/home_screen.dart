@@ -71,7 +71,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  List<Event> get filteredEvents => _remoteEvents;
+  List<Event> get filteredEvents =>
+      _remoteEvents.where((event) => event.isAvailable).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -174,7 +175,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ),
                             );
-                            return;
                           }
                         }
                         if (!context.mounted) return;

@@ -2,9 +2,15 @@ import 'package:flutter/material.dart';
 
 class ProfileHeaderCard extends StatelessWidget {
   final String email;
+  final String name;
   final VoidCallback? onAvatarTap;
 
-  const ProfileHeaderCard({super.key, required this.email, this.onAvatarTap});
+  const ProfileHeaderCard({
+    super.key,
+    required this.email,
+    this.name = '',
+    this.onAvatarTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +36,17 @@ class ProfileHeaderCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16.0),
+          if (name.isNotEmpty) ...[
+            Text(
+              name,
+              style: const TextStyle(
+                fontSize: 18,
+                color: Color(0xFF1E293B),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           Container(
             padding: const EdgeInsets.symmetric(
               horizontal: 20.0,

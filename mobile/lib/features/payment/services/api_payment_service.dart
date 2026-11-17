@@ -31,18 +31,21 @@ class ApiPaymentService implements PaymentService {
 
   Future<CheckoutSession> initiateOrderPayment({
     required String orderId,
+    required int amount,
     required PaymentMethod method,
     required String phone,
   }) async {
+    if (orderId.trim().isEmpty || amount <= 0) {
+      throw const PaymentException('Order ID and amount are required to pay.');
+    }
     final response = await _apiClient.post(ApiEndpoints.paymentCheckout, {
       'orderId': _numericOrString(orderId),
+      'amount': amount,
     });
     final data = _objectResponse(response, 'payment');
     final checkoutUrl = _firstString([
       data['checkoutUrl'],
       data['checkout_url'],
-      data['paymentUrl'],
-      data['payment_url'],
       _nested(data['payment'])['checkoutUrl'],
       _nested(data['payment'])['checkout_url'],
     ]);
@@ -70,12 +73,29 @@ class ApiPaymentService implements PaymentService {
     );
   }
 
+  Future<Map<String, dynamic>> createMockPayment({
+    required String orderId,
+    required int amount,
+  }) async {
+    if (orderId.trim().isEmpty || amount <= 0) {
+      throw const PaymentException('Order ID and amount are required to pay.');
+    }
+    final response = await _apiClient.post(ApiEndpoints.payments, {
+      'orderId': _numericOrString(orderId),
+      'amount': amount,
+      'succeed': true,
+    });
+    return _objectResponse(response, 'payment');
+  }
+
   Future<Map<String, dynamic>> verifyOrder(String orderId) async {
     final response = await _apiClient.post(ApiEndpoints.paymentVerify, {
       'orderId': _numericOrString(orderId),
     });
     if (response is! Map) {
-      throw const ApiException('The server returned invalid payment verification data.');
+      throw const ApiException(
+        'The server returned invalid payment verification data.',
+      );
     }
     final outer = Map<String, dynamic>.from(response);
     final data = outer['data'];
@@ -90,13 +110,20 @@ class ApiPaymentService implements PaymentService {
   }
 
   Future<List<Map<String, dynamic>>> getOrderTickets(String orderId) async {
-    final response = await _apiClient.get(ApiEndpoints.orderTickets(Uri.encodeComponent(orderId)));
+    final response = await _apiClient.get(
+      ApiEndpoints.orderTickets(Uri.encodeComponent(orderId)),
+    );
     final values = _listResponse(response, 'tickets');
-    return values.map((value) => Map<String, dynamic>.from(value as Map)).toList();
+    return values
+        .map((value) => Map<String, dynamic>.from(value as Map))
+        .toList();
   }
 
   Future<Map<String, dynamic>> cancelOrder(String orderId) async {
-    final response = await _apiClient.post(ApiEndpoints.cancelOrder(Uri.encodeComponent(orderId)), const {});
+    final response = await _apiClient.post(
+      ApiEndpoints.cancelOrder(Uri.encodeComponent(orderId)),
+      const {},
+    );
     return _objectResponse(response, 'order');
   }
 

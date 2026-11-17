@@ -1,10 +1,16 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+import '../core/storage/pending_checkout_store.dart';
+import '../features/payment/services/pending_checkout_manager.dart';
 import '../features/auth/logic/auth_controller.dart';
 import '../features/tickets/logic/tickets_controller.dart';
 import '../models/ticket.dart';
 import '../theme/app_colors.dart';
 import '../widgets/login_required_view.dart';
+import '../widgets/event_image.dart';
 import '../widgets/offline_banner.dart';
 import '../widgets/retry_error_view.dart';
 import 'main_shell.dart';
@@ -12,7 +18,9 @@ import 'ticket_details_screen.dart';
 
 /// Displays tickets purchased by the currently authenticated customer.
 class TicketsScreen extends StatefulWidget {
-  const TicketsScreen({super.key});
+  const TicketsScreen({super.key, this.pendingCheckoutManager});
+
+  final PendingCheckoutManager? pendingCheckoutManager;
 
   @override
   State<TicketsScreen> createState() => _TicketsScreenState();
@@ -20,18 +28,96 @@ class TicketsScreen extends StatefulWidget {
 
 class _TicketsScreenState extends State<TicketsScreen> {
   bool _loading = true;
+  PendingCheckout? _pendingCheckout;
+  bool _checkingPending = false;
+  bool _verifyingPayment = false;
+  late final PendingCheckoutManager _pendingManager =
+      widget.pendingCheckoutManager ?? PendingCheckoutManager();
 
   @override
   void initState() {
     super.initState();
     ticketsController.addListener(_onTicketsChanged);
+    authController.addListener(_onAuthChanged);
+    mainTabIndex.addListener(_onTabChanged);
     _load();
   }
 
   @override
   void dispose() {
     ticketsController.removeListener(_onTicketsChanged);
+    authController.removeListener(_onAuthChanged);
+    mainTabIndex.removeListener(_onTabChanged);
     super.dispose();
+  }
+
+  void _onAuthChanged() {
+    if (mounted) setState(() => _pendingCheckout = null);
+    if (authController.isLoggedIn) {
+      unawaited(_checkPendingCheckout());
+    }
+  }
+
+  void _onTabChanged() {
+    if (mainTabIndex.value == 1) unawaited(_checkPendingCheckout());
+  }
+
+  Future<void> _checkPendingCheckout() async {
+    final userId = authController.stableUserId;
+    if (userId == null || _checkingPending) return;
+    _checkingPending = true;
+    if (mounted) setState(() => _pendingCheckout = null);
+    try {
+      final store = PendingCheckoutStore();
+      final pending = await store.read(userId: userId);
+      if (pending == null) {
+        if (mounted) setState(() => _pendingCheckout = null);
+        return;
+      }
+      if (DateTime.now().difference(pending.createdAt) >
+          const Duration(minutes: 30)) {
+        await store.clear(userId: userId);
+        if (mounted) setState(() => _pendingCheckout = null);
+        return;
+      }
+      final result = await _pendingManager.check(pending, userId: userId);
+      if (result == PendingCheckoutResolution.paid && mounted) {
+        setState(() => _pendingCheckout = null);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Payment confirmed')));
+      } else if (result == PendingCheckoutResolution.pending && mounted) {
+        setState(() => _pendingCheckout = pending);
+      } else if (result == PendingCheckoutResolution.cleared && mounted) {
+        setState(() => _pendingCheckout = null);
+      }
+    } catch (_) {
+      // Keep the record and stay quiet when the server cannot be reached.
+    } finally {
+      _checkingPending = false;
+    }
+  }
+
+  Future<void> _verifyPendingCheckout() async {
+    final pending = _pendingCheckout;
+    final userId = authController.stableUserId;
+    if (pending == null || userId == null || _verifyingPayment) return;
+    setState(() => _verifyingPayment = true);
+    try {
+      final result = await _pendingManager.verify(pending, userId: userId);
+      if (result == PendingCheckoutResolution.paid && mounted) {
+        setState(() => _pendingCheckout = null);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Payment confirmed')));
+      } else if (result == PendingCheckoutResolution.pending && mounted) {
+        setState(() => _pendingCheckout = pending);
+      } else if (result == PendingCheckoutResolution.cleared && mounted) {
+        setState(() => _pendingCheckout = null);
+      }
+    } catch (_) {
+      // A network failure keeps the pending checkout available for a later retry.
+    } finally {
+      if (mounted) setState(() => _verifyingPayment = false);
+    }
   }
 
   void _onTicketsChanged() {
@@ -65,6 +151,47 @@ class _TicketsScreenState extends State<TicketsScreen> {
     );
   }
 
+  Widget _pendingNotice() => Card(
+    margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+    color: AppColors.card,
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'You have a payment that was not completed.',
+            style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              TextButton(
+                onPressed: _verifyingPayment ? null : _verifyPendingCheckout,
+                child: _verifyingPayment
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Verify payment'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  await PendingCheckoutStore().clear(
+                    userId: authController.stableUserId,
+                  );
+                  if (mounted) setState(() => _pendingCheckout = null);
+                },
+                child: const Text('Dismiss'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -85,10 +212,20 @@ class _TicketsScreenState extends State<TicketsScreen> {
             ),
           ),
           body: authController.isLoggedIn
-              ? ListenableBuilder(
-                  listenable: ticketsController,
-                  builder: (context, _) =>
-                      _buildBody(ticketsController.tickets),
+              ? SafeArea(
+                  top: false,
+                  child: Column(
+                    children: [
+                      if (_pendingCheckout != null) _pendingNotice(),
+                      Expanded(
+                        child: ListenableBuilder(
+                          listenable: ticketsController,
+                          builder: (context, _) =>
+                              _buildBody(ticketsController.tickets),
+                        ),
+                      ),
+                    ],
+                  ),
                 )
               : const LoginRequiredView(
                   title: 'Log in to view your tickets',
@@ -196,28 +333,12 @@ class _TicketCard extends StatelessWidget {
                   SizedBox(
                     width: imageWidth,
                     height: 190,
-                    child: ticket.imagePath.isEmpty
-                        ? const ColoredBox(
-                            color: AppColors.card,
-                            child: Icon(
-                              Icons.image_outlined,
-                              color: Colors.white70,
-                              size: 36,
-                            ),
-                          )
-                        : ticket.imagePath.startsWith('http')
-                        ? Image.network(
-                            ticket.imagePath,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) =>
-                                const _TicketImageError(),
-                          )
-                        : Image.asset(
-                            ticket.imagePath,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) =>
-                                const _TicketImageError(),
-                          ),
+                    child: EventImage(
+                      imagePath: ticket.imagePath,
+                      fit: BoxFit.cover,
+                      iconSize: 36,
+                      fallbackIcon: Icons.image_outlined,
+                    ),
                   ),
                   Expanded(
                     child: Padding(
@@ -235,8 +356,10 @@ class _TicketCard extends StatelessWidget {
                             ),
                           ),
                           _TicketText('Ticket ID: ${ticket.id}'),
-                          _TicketText(ticket.date),
+                          _TicketText(_formatEventDate(ticket.date)),
                           _TicketText(ticket.venue),
+                          if (ticket.location.isNotEmpty)
+                            _TicketText(ticket.location),
                           _TicketText('Status: ${ticket.status}'),
                           const _StatusChip(),
                         ],
@@ -251,6 +374,12 @@ class _TicketCard extends StatelessWidget {
       );
     },
   );
+
+  String _formatEventDate(String value) {
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) return value;
+    return '${DateFormat('EEEE, d MMMM yyyy').format(parsed)} · ${DateFormat('h:mm a').format(parsed)}';
+  }
 }
 
 class _StatusChip extends StatelessWidget {
@@ -295,15 +424,5 @@ class _TicketText extends StatelessWidget {
     maxLines: 1,
     overflow: TextOverflow.ellipsis,
     style: style ?? const TextStyle(color: AppColors.textDark),
-  );
-}
-
-class _TicketImageError extends StatelessWidget {
-  const _TicketImageError();
-
-  @override
-  Widget build(BuildContext context) => const ColoredBox(
-    color: AppColors.card,
-    child: Icon(Icons.broken_image_outlined, color: Colors.white70, size: 36),
   );
 }

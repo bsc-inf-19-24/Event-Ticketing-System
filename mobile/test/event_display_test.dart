@@ -8,12 +8,14 @@ import 'package:mobile/core/api_client.dart';
 import 'package:mobile/features/events/event_api.dart';
 import 'package:mobile/models/event.dart';
 import 'package:mobile/screens/event_details_screen.dart';
+import 'package:mobile/utils/server_image_url.dart';
 import 'package:mobile/widgets/event_card.dart';
 
 const afroFusionJson = <String, dynamic>{
   'id': 7,
   'title': 'AfroFusion Live 2026',
   'category': 'Concerts',
+  'description': 'A live Afro fusion performance.',
   'genre': null,
   'venue': 'Comesa Hall',
   'location': 'Blantyre',
@@ -56,6 +58,9 @@ void main() {
       expect(event.place, 'Comesa Hall, Blantyre');
       expect(event.displayGenre, 'Music & Entertainment');
       expect(event.price, 15000);
+      expect(event.capacity, 300);
+      expect(event.description, 'A live Afro fusion performance.');
+      expect(event.category, 'Concerts');
       expect(event.statusLabel, 'Available');
       expect(event.ticketTypes.map((type) => type.id), ['11', '12']);
       expect(event.ticketTypes.map((type) => type.remainingInventory), [
@@ -168,6 +173,38 @@ void main() {
     });
   });
 
+  test(
+    'resolves relative and localhost images with the configured API host',
+    () {
+      expect(
+        resolveServerImageUrl('/uploads/event.jpg', 'http://localhost:8082'),
+        'http://localhost:8082/uploads/event.jpg',
+      );
+      expect(
+        resolveServerImageUrl(
+          'http://localhost:8080/uploads/event.jpg',
+          'http://localhost:8082',
+        ),
+        'http://localhost:8082/uploads/event.jpg',
+      );
+    },
+  );
+
+  test('cancelled status overrides an available availability field', () async {
+    final event = await _apiFor(
+      (_) async => http.Response(
+        jsonEncode({
+          ...afroFusionJson,
+          'status': 'CANCELLED',
+          'availability': 'AVAILABLE',
+        }),
+        200,
+      ),
+    ).details('7');
+    expect(event.isAvailable, isFalse);
+    expect(event.statusLabel, 'Cancelled');
+  });
+
   testWidgets('event card displays formatted agreed details', (tester) async {
     final event = await _apiFor(
       (_) async => http.Response(jsonEncode(afroFusionJson), 200),
@@ -185,6 +222,33 @@ void main() {
     expect(find.textContaining('2026-11-21T'), findsNothing);
   });
 
+  testWidgets('event card resolves a relative cover path as a network image', (
+    tester,
+  ) async {
+    final event = Event(
+      id: 'relative-image',
+      title: 'Relative image event',
+      date: '',
+      time: '',
+      venue: '',
+      price: 0,
+      imagePath: '/uploads/events/card-cover.jpg',
+      category: '',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: EventCard(event: event)),
+      ),
+    );
+
+    final image = tester.widget<Image>(find.byType(Image).first);
+    expect(image.image, isA<NetworkImage>());
+    expect(
+      (image.image as NetworkImage).url,
+      endsWith('/uploads/events/card-cover.jpg'),
+    );
+  });
+
   testWidgets('details screen displays AfroFusion types and server capacity', (
     tester,
   ) async {
@@ -196,6 +260,7 @@ void main() {
     );
     await tester.scrollUntilVisible(find.text('VIP Ticket'), 300);
     expect(find.text('AfroFusion Live 2026'), findsOneWidget);
+    expect(find.text('A live Afro fusion performance.'), findsOneWidget);
     expect(find.text('Music & Entertainment'), findsOneWidget);
     expect(find.text('6:00 PM - 11:30 PM'), findsOneWidget);
     expect(find.text('Comesa Hall, Blantyre'), findsOneWidget);

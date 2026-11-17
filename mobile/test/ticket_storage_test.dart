@@ -33,7 +33,7 @@ void main() {
     final storage = TicketStorage(databaseName: databaseName);
 
     await storage.saveTicket(ticket);
-    final stored = await storage.getTicket(ticket.id);
+    final stored = await storage.getTicket(ticket.id, userId: ticket.userId);
 
     expect(stored, isNotNull);
     expect(stored!.eventName, ticket.eventName);
@@ -51,12 +51,24 @@ void main() {
         price: ticket.price,
       ),
     );
-    expect((await storage.getSavedTickets()), hasLength(1));
-    expect((await storage.getTicket(ticket.id))!.eventName, ticket.eventName);
+    expect(
+      (await storage.getSavedTickets(userId: ticket.userId)),
+      hasLength(1),
+    );
+    expect(
+      (await storage.getTicket(ticket.id, userId: ticket.userId))!.eventName,
+      ticket.eventName,
+    );
 
     await storage.close();
     final reopenedStorage = TicketStorage(databaseName: databaseName);
-    expect((await reopenedStorage.getTicket(ticket.id))!.qrData, ticket.qrData);
+    expect(
+      (await reopenedStorage.getTicket(
+        ticket.id,
+        userId: ticket.userId,
+      ))!.qrData,
+      ticket.qrData,
+    );
 
     final offlineTickets = await TicketRepository(storage: reopenedStorage)
         .load(userId: ticket.userId, hasConnection: false);
@@ -76,13 +88,19 @@ void main() {
         price: 3000,
       ),
     );
-    final updated = (await reopenedStorage.getTicket(ticket.id))!;
+    final updated = (await reopenedStorage.getTicket(
+      ticket.id,
+      userId: ticket.userId,
+    ))!;
     expect(updated.eventName, 'Updated concert');
     expect(updated.status, 'Used');
     expect(updated.downloadedAt, stored.downloadedAt);
 
     await reopenedStorage.deleteTicket(ticket.id, userId: ticket.userId);
-    expect(await reopenedStorage.getTicket(ticket.id), isNull);
+    expect(
+      await reopenedStorage.getTicket(ticket.id, userId: ticket.userId),
+      isNull,
+    );
     await reopenedStorage.close();
     await databaseFactory.deleteDatabase(
       path.join(await getDatabasesPath(), databaseName),

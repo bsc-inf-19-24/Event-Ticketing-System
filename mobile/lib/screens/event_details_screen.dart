@@ -125,6 +125,10 @@ class EventDetailsScreen extends StatelessWidget {
               style: const TextStyle(color: Colors.white, fontSize: 18),
             ),
           ],
+          if (event.description.trim().isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(event.description.trim(), style: _bodyStyle),
+          ],
           if (event.hasStart) ...[
             const SizedBox(height: 16),
             Text(event.displayDate, style: _bodyStyle),
@@ -146,7 +150,9 @@ class EventDetailsScreen extends StatelessWidget {
           for (final ticket in event.ticketTypes) ...[
             Row(
               children: [
-                Expanded(child: Text('${ticket.name} Ticket', style: _bodyStyle)),
+                Expanded(
+                  child: Text('${ticket.name} Ticket', style: _bodyStyle),
+                ),
                 if (ticket.remainingInventory == 0)
                   const Text('Sold out', style: _bodyStyle),
               ],

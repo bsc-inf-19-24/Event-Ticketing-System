@@ -2,7 +2,8 @@ import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import '../core/storage/pending_checkout_store.dart';
 
 import '../features/auth/logic/auth_controller.dart';
 import '../features/payment/logic/payment_return_handler.dart';
@@ -34,8 +35,6 @@ class _MainShellState extends State<MainShell> {
   final AppLinks _appLinks = AppLinks();
   StreamSubscription<Uri>? _linkSubscription;
   late final PaymentReturnHandler _returnHandler;
-  String? _savedOrderId;
-  String? _returnError;
 
   @override
   void initState() {
@@ -45,16 +44,7 @@ class _MainShellState extends State<MainShell> {
   }
 
   Future<void> _restorePaymentReturn() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedOrderId = prefs.getString(
-      PaymentController.pendingOrderPreference,
-    );
     if (!mounted) return;
-    if (savedOrderId != null) {
-      _savedOrderId = savedOrderId;
-      _returnHandler.preserveOrder(savedOrderId);
-      setState(() {});
-    }
     _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
       unawaited(_returnHandler.handle(uri));
     });
@@ -68,12 +58,7 @@ class _MainShellState extends State<MainShell> {
     String? txRef,
   }) async {
     try {
-      final preferences = await SharedPreferences.getInstance();
-      await preferences.setString(
-        PaymentController.pendingOrderPreference,
-        orderId,
-      );
-      if (mounted) setState(() => _savedOrderId = orderId);
+      await PendingCheckoutStore().save(orderId);
       final api = ApiPaymentService();
       final raw = await api.getOrder(orderId);
       final orderData = raw;
@@ -132,20 +117,7 @@ class _MainShellState extends State<MainShell> {
           ),
         ),
       );
-      final prefs = await SharedPreferences.getInstance();
-      final stillPending = prefs.getString(
-        PaymentController.pendingOrderPreference,
-      );
-      if (mounted) {
-        setState(() {
-          _savedOrderId = stillPending;
-          _returnError = null;
-        });
-      }
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _returnError = error.toString());
-    }
+    } catch (_) {}
   }
 
   Map<String, dynamic> _nested(dynamic value) =>
@@ -173,31 +145,12 @@ class _MainShellState extends State<MainShell> {
         valueListenable: mainTabIndex,
         builder: (context, currentIndex, _) => Scaffold(
           backgroundColor: AppColors.background,
-          body: Column(
+          body: IndexedStack(
+            index: currentIndex,
             children: [
-              if (_savedOrderId != null)
-                MaterialBanner(
-                  content: Text(
-                    _returnError ?? 'Checkout was interrupted or the return link was missed. Verify the saved order to retry.',
-                  ),
-                  leading: const Icon(Icons.pending_actions),
-                  actions: [
-                    TextButton(
-                      onPressed: () => _verifyReturnedOrder(_savedOrderId!),
-                      child: const Text('Verify order'),
-                    ),
-                  ],
-                ),
-              Expanded(
-                child: IndexedStack(
-                  index: currentIndex,
-                  children: [
-                    HomeScreen(onViewTickets: () => mainTabIndex.value = 1),
-                    const TicketsScreen(),
-                    const ProfileScreen(),
-                  ],
-                ),
-              ),
+              HomeScreen(onViewTickets: () => mainTabIndex.value = 1),
+              const TicketsScreen(),
+              const ProfileScreen(),
             ],
           ),
           bottomNavigationBar: SafeArea(

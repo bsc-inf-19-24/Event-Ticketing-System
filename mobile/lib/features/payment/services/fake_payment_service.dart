@@ -162,11 +162,10 @@ const useFakeTickets = bool.fromEnvironment(
   defaultValue: true,
 );
 
-
 /// Kept as a source-compatible alias for existing widgets and tests.
 const useFakePayments = useFakePayment;
 
 /// Set USE_FAKE_PAYMENT=false for the backend-backed order/payment flow.
-final PaymentService paymentService = useFakePayment
+final PaymentService paymentService = useFakePayment && useFakeTickets
     ? FakePaymentService()
     : ApiPaymentService();

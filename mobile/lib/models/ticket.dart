@@ -1,8 +1,11 @@
+import '../utils/server_image_url.dart';
+
 class Ticket {
   final String id;
   final String eventName;
   final String date;
   final String venue;
+  final String location;
   final String status;
   final String qrData;
   final String ticketType;
@@ -24,6 +27,7 @@ class Ticket {
     required this.eventName,
     required this.date,
     required this.venue,
+    this.location = '',
     required this.status,
     required this.qrData,
     this.ticketType = 'Standard',
@@ -52,6 +56,7 @@ class Ticket {
     'price': price,
     'date': date,
     'venue': venue,
+    'location': location,
     'status': status,
     'purchasedOn': purchasedOn,
     'used': used,
@@ -111,6 +116,7 @@ class Ticket {
       eventName: _stringValue(json['eventName'], fallback: 'Event'),
       date: _stringValue(json['date']),
       venue: _stringValue(json['venue']),
+      location: _stringValue(json['location']),
       status: _stringValue(json['status'], fallback: 'Confirmed'),
       qrData: _stringValue(json['qrData']),
       ticketType: _stringValue(json['ticketType'], fallback: 'Standard'),
@@ -143,23 +149,26 @@ class Ticket {
     final customer = _nestedMap(
       json['customer'] ?? json['user'] ?? json['owner'],
     );
-    final qr =
-        json['qrCode'] ??
-        json['qr_code'] ??
-        json['qrCodeData'] ??
-        json['qr_code_data'] ??
-        json['qrCodeUrl'] ??
-        json['qr_code_url'] ??
-        json['qrData'] ??
-        json['qr_data'] ??
-        json['qr'];
-    final ownerId = _firstString([
-      json['userId'],
-      json['user_id'],
-      json['customerId'],
-      json['customer_id'],
-      customer['id'],
+    final qr = _firstQrString([
+      json['qrContent'],
+      json['qr_content'],
+      json['qrCode'],
+      json['qr_code'],
+      json['qrCodeData'],
+      json['qr_code_data'],
+      json['qrPayload'],
+      json['qr_payload'],
+      json['qrCodeContent'],
+      json['qr_code_content'],
+      json['ticketQrCode'],
+      json['ticket_qr_code'],
+      json['qrCodeUrl'],
+      json['qr_code_url'],
+      json['qrData'],
+      json['qr_data'],
+      json['qr'],
     ]);
+    final ownerId = ticketOwnerIdFromJson(json) ?? '';
 
     return Ticket(
       id: _firstString([
@@ -191,12 +200,21 @@ class Ticket {
         event['venue'],
         _nestedMap(event['location'])['name'],
       ]),
+      location: _firstString([
+        json['location'],
+        json['eventLocation'],
+        json['event_location'],
+        event['location'] is String
+            ? event['location']
+            : _nestedMap(event['location'])['address'],
+        _nestedMap(event['location'])['city'],
+      ]),
       status: _firstString([
         json['status'],
         json['ticketStatus'],
         json['ticket_status'],
       ], fallback: 'Issued'),
-      qrData: _qrString(json['qrContent'] ?? json['qr_content'] ?? qr),
+      qrData: qr,
       ticketType: _firstString([
         json['ticketTypeName'],
         json['ticket_type_name'],
@@ -219,15 +237,31 @@ class Ticket {
         json['created_at'],
       ]),
       imagePath: _resolveServerImagePath(
-        _firstString([
+        _firstImagePath([
           json['imagePath'],
           json['image_path'],
           json['coverImagePath'],
           json['cover_image_path'],
+          json['coverImageUrl'],
+          json['cover_image_url'],
+          json['coverImage'],
+          json['cover_image'],
+          json['imageUrl'],
+          json['image_url'],
+          json['posterUrl'],
+          json['poster_url'],
           event['imagePath'],
           event['image_path'],
           event['coverImagePath'],
           event['cover_image_path'],
+          event['coverImageUrl'],
+          event['cover_image_url'],
+          event['coverImage'],
+          event['cover_image'],
+          event['imageUrl'],
+          event['image_url'],
+          event['posterUrl'],
+          event['poster_url'],
           event['image'],
         ]),
         imageBaseUrl,
@@ -280,6 +314,7 @@ class Ticket {
     String? eventName,
     String? date,
     String? venue,
+    String? location,
     String? status,
     String? qrData,
     String? ticketType,
@@ -300,6 +335,7 @@ class Ticket {
     eventName: eventName ?? this.eventName,
     date: date ?? this.date,
     venue: venue ?? this.venue,
+    location: location ?? this.location,
     status: status ?? this.status,
     qrData: qrData ?? this.qrData,
     ticketType: ticketType ?? this.ticketType,
@@ -319,13 +355,7 @@ class Ticket {
 }
 
 String _resolveServerImagePath(String imagePath, String? baseUrl) {
-  if (imagePath.isEmpty || imagePath.startsWith('assets/')) return imagePath;
-  final uri = Uri.tryParse(imagePath);
-  if (uri != null && uri.hasScheme) return imagePath;
-  if (baseUrl == null || baseUrl.isEmpty) return imagePath;
-  return Uri.parse('${baseUrl.replaceFirst(RegExp(r'/+$'), '')}/')
-      .resolve(imagePath)
-      .toString();
+  return resolveServerImageUrl(imagePath, baseUrl ?? '');
 }
 
 String _stringValue(dynamic value, {String fallback = ''}) =>
@@ -335,6 +365,24 @@ Map<String, dynamic> _nestedMap(dynamic value) {
   if (value is Map<String, dynamic>) return value;
   if (value is Map) return Map<String, dynamic>.from(value);
   return const {};
+}
+
+String? ticketOwnerIdFromJson(Map<String, dynamic> json) {
+  final customer = _nestedMap(
+    json['customer'] ?? json['user'] ?? json['owner'],
+  );
+  final owner = _firstString([
+    json['userId'],
+    json['user_id'],
+    json['customerId'],
+    json['customer_id'],
+    json['ownerId'],
+    json['owner_id'],
+    customer['id'],
+    customer['userId'],
+    customer['user_id'],
+  ]);
+  return owner.isEmpty ? null : owner;
 }
 
 String _firstString(List<dynamic> values, {String fallback = ''}) {
@@ -352,9 +400,40 @@ String _qrString(dynamic value) {
     data['data'],
     data['value'],
     data['content'],
+    data['payload'],
+    data['qrPayload'],
+    data['qr_payload'],
+    data['qrCode'],
+    data['qr_code'],
+    data['qrContent'],
+    data['qr_content'],
+    data['code'],
     data['text'],
     data['url'],
   ]);
+}
+
+String _firstQrString(List<dynamic> values) {
+  for (final value in values) {
+    final payload = _qrString(value);
+    if (payload.isNotEmpty) return payload;
+  }
+  return '';
+}
+
+String _firstImagePath(List<dynamic> values) {
+  for (final value in values) {
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+    final image = _nestedMap(value);
+    final path = _firstString([
+      image['url'],
+      image['path'],
+      image['src'],
+      image['href'],
+    ]);
+    if (path.isNotEmpty) return path;
+  }
+  return '';
 }
 
 int _intValue(List<dynamic> values) {

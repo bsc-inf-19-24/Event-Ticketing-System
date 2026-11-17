@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/api_client.dart';
 import '../features/orders/models/order.dart';
 import '../features/payment/logic/payment_controller.dart';
 import '../features/payment/models/payment_models.dart';
@@ -10,6 +11,7 @@ import '../models/event.dart';
 import '../theme/app_colors.dart';
 import '../utils/format.dart';
 import 'payment_flow_screens.dart';
+import 'payment_result_screen.dart' as payment_status;
 
 /// Confirms the selected tickets before handing payment off to PayChangu.
 class CheckoutScreen extends StatefulWidget {
@@ -222,17 +224,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final cancelPrompt = _cancelPrompt;
       if (cancelPrompt != null) await cancelPrompt;
       if (!mounted || _cancelRequested) return;
-      final page = PayChanguCheckoutScreen(
-        event: widget.event,
-        controller: _paymentController,
-      );
+      final page = useFakePayments
+          ? payment_status.PaymentResultScreen(
+              event: widget.event,
+              controller: _paymentController,
+              initialPaid: _paymentController.paymentState == 'paid',
+              initialMessage: _paymentController.failureReason,
+            )
+          : PayChanguCheckoutScreen(
+              event: widget.event,
+              controller: _paymentController,
+            );
       Navigator.push(context, MaterialPageRoute(builder: (_) => page));
     } catch (error) {
       if (mounted && !_cancelRequested) {
         setState(
-          () => _error = error is PaymentException
-              ? error.message
-              : 'We could not start the payment. Please try again.',
+          () => _error = switch (error) {
+            ApiException(:final message, :final statusCode) =>
+              statusCode == null ? message : '$message (HTTP $statusCode)',
+            PaymentException(:final message) => message,
+            _ => error.toString(),
+          },
         );
       }
     } finally {

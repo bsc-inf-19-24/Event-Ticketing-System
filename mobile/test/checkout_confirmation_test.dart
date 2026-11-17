@@ -40,7 +40,7 @@ void main() {
 
     expect(find.text('AfroFusion Live 2026'), findsOneWidget);
     expect(find.text('Standard Ticket × 2'), findsOneWidget);
-    expect(find.text('MWK 30,000'), findsOneWidget);
+    expect(find.text('MWK 30,000'), findsNWidgets(2));
     expect(
       find.text('You will enter your payment details securely on PayChangu.'),
       findsOneWidget,

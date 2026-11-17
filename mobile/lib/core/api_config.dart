@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiConfig {
+  static const _configuredBaseUrl = String.fromEnvironment('API_BASE_URL');
   static const _defaultBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'http://10.0.2.2:8080',
@@ -22,7 +23,9 @@ class ApiConfig {
 
   static Future<void> load() async {
     final preferences = await SharedPreferences.getInstance();
-    _baseUrl = preferences.getString(_baseUrlKey) ?? _defaultBaseUrl;
+    _baseUrl = _configuredBaseUrl.isNotEmpty
+        ? _defaultBaseUrl
+        : preferences.getString(_baseUrlKey) ?? _defaultBaseUrl;
   }
 
   static Future<void> setBaseUrl(String value) async {

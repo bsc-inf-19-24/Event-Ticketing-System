@@ -7,6 +7,36 @@ import 'package:mobile/features/events/event_api.dart';
 import 'package:mobile/screens/home_screen.dart';
 
 void main() {
+  testWidgets(
+    'Home excludes cancelled events even if availability says available',
+    (WidgetTester tester) async {
+      final eventApi = EventApi(
+        client: ApiClient(
+          baseUrl: 'https://api.test',
+          client: MockClient((request) async {
+            if (request.url.path == '/api/events') {
+              return http.Response(
+                '[{"id":1,"name":"Cancelled show","status":"CANCELLED","availability":"AVAILABLE"},'
+                '{"id":2,"name":"Live show","status":"PUBLISHED"}]',
+                200,
+              );
+            }
+            return http.Response('[]', 200);
+          }),
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HomeScreen(onViewTickets: _onViewTickets, eventApi: eventApi),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cancelled show'), findsNothing);
+      expect(find.text('Live show'), findsOneWidget);
+    },
+  );
+
   testWidgets('Home displays server events and no fake fallback', (
     WidgetTester tester,
   ) async {

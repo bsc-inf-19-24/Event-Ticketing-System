@@ -18,9 +18,23 @@
       "type": "dart",
       "program": "lib/main.dart",
       "args": [
-        "--dart-define=API_BASE_URL=http://localhost:8081",
+        "--dart-define=API_BASE_URL=http://localhost:8082",
         "--dart-define=USE_FAKE_AUTH=false",
         "--dart-define=USE_FAKE_PAYMENT=false",
+        "--dart-define=USE_FAKE_TICKETS=false",
+        "--dart-define=ASSUME_PAYMENT_SUCCESS=false",
+        "--dart-define=ALLOW_LOCAL_TICKET_FALLBACK=false"
+      ]
+    },
+    {
+      "name": "Ticket Master - Mock payment API (USB device)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": [
+        "--dart-define=API_BASE_URL=http://localhost:8082",
+        "--dart-define=USE_FAKE_AUTH=false",
+        "--dart-define=USE_FAKE_PAYMENT=true",
         "--dart-define=USE_FAKE_TICKETS=false",
         "--dart-define=ASSUME_PAYMENT_SUCCESS=false",
         "--dart-define=ALLOW_LOCAL_TICKET_FALLBACK=false"

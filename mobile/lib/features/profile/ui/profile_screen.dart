@@ -5,6 +5,8 @@ import 'package:mobile/features/auth/logic/auth_controller.dart';
 import 'package:mobile/theme/app_colors.dart';
 import 'package:mobile/widgets/login_required_view.dart';
 
+import '../data/profile_repository.dart';
+
 import 'widgets/profile_header_card.dart';
 import 'widgets/profile_menu_item.dart';
 
@@ -12,8 +14,75 @@ import 'package:mobile/screens/settings_screen.dart';
 import 'package:mobile/screens/contact_us.dart';
 import 'package:mobile/screens/privacy_policy_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  String? _phone;
+  String? _city;
+  String? _profileUserId;
+  bool _profileLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    authController.addListener(_loadProfile);
+    _loadProfile();
+  }
+
+  @override
+  void dispose() {
+    authController.removeListener(_loadProfile);
+    super.dispose();
+  }
+
+  Future<void> _loadProfile() async {
+    final userId = authController.stableUserId;
+    if (userId == null) {
+      _profileUserId = null;
+      if (mounted) {
+        setState(() {
+          _phone = null;
+          _city = null;
+        });
+      }
+      return;
+    }
+    if (_profileUserId == userId || _profileLoading) return;
+    _profileLoading = true;
+    if (mounted) {
+      setState(() {
+        _phone = null;
+        _city = null;
+      });
+    }
+    try {
+      final profile = await ProfileRepository().fetchUserProfile();
+      if (!mounted) {
+        return;
+      }
+      _profileUserId = userId;
+      setState(() {
+        _phone =
+            (profile['phone'] ??
+                    profile['phoneNumber'] ??
+                    profile['phone_number'])
+                ?.toString();
+        final location = profile['location'] is Map
+            ? Map<String, dynamic>.from(profile['location'] as Map)
+            : const <String, dynamic>{};
+        _city = (profile['city'] ?? location['city'])?.toString();
+      });
+    } catch (_) {
+      _profileUserId = userId;
+    } finally {
+      _profileLoading = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -135,9 +204,14 @@ class ProfileScreen extends StatelessWidget {
                     ListenableBuilder(
                       listenable: authController,
                       builder: (context, child) => ProfileHeaderCard(
+                        name: authController.user?.name ?? '',
                         email: authController.user?.email ?? 'Not signed in',
                       ),
                     ),
+                    if (_phone?.isNotEmpty == true)
+                      _ProfileValue(label: 'Phone', value: _phone!),
+                    if (_city?.isNotEmpty == true)
+                      _ProfileValue(label: 'City', value: _city!),
                     const SizedBox(height: 24.0),
 
                     // Menu List Items
@@ -236,4 +310,16 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ProfileValue extends StatelessWidget {
+  const _ProfileValue({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    title: Text(label, style: const TextStyle(color: Colors.white70)),
+    subtitle: Text(value, style: const TextStyle(color: Colors.white)),
+  );
 }

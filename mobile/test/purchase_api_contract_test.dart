@@ -90,11 +90,15 @@ void main() {
       );
       final session = await service.initiateOrderPayment(
         orderId: '501',
+        amount: 35000,
         method: PaymentMethod.card,
         phone: '',
       );
       expect(session.txRef, 'tx-1');
-      expect(calls[ApiEndpoints.paymentCheckout], {'orderId': 501});
+      expect(calls[ApiEndpoints.paymentCheckout], {
+        'orderId': 501,
+        'amount': 35000,
+      });
       final verified = await service.verifyOrder('501');
       expect(calls[ApiEndpoints.paymentVerify], {'orderId': 501});
       expect(verified['paymentStatus'], 'PENDING');
@@ -194,14 +198,22 @@ void main() {
 
   test('ticket QR content is read verbatim from qrContent', () {
     const qr = 'signed|payload:do-not-normalize';
-    final ticket = Ticket.fromServer({
-      'id': 99,
-      'ticketCode': 'T-99',
-      'qrContent': qr,
-      'status': 'ISSUED',
-      'event': {'name': 'Festival'},
-    }, authenticatedUserId: 'customer-1');
+    final ticket = Ticket.fromServer(
+      {
+        'id': 99,
+        'ticketCode': 'T-99',
+        'qrContent': qr,
+        'status': 'ISSUED',
+        'event': {
+          'name': 'Festival',
+          'coverImagePath': '/uploads/festival.jpg',
+        },
+      },
+      authenticatedUserId: 'customer-1',
+      imageBaseUrl: 'http://localhost:8082',
+    );
     expect(ticket.qrPayload, qr);
     expect(ticket.source, 'server');
+    expect(ticket.imagePath, 'http://localhost:8082/uploads/festival.jpg');
   });
 }
