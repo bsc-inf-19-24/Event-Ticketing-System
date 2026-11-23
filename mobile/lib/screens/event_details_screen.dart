@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/event.dart';
@@ -6,14 +8,58 @@ import '../utils/format.dart';
 import '../utils/auth_guard.dart';
 import '../widgets/event_image.dart';
 import 'ticket_selection_screen.dart';
+import '../features/favorites/data/event_favorites_repository.dart';
+import '../features/interests/data/interest_repository.dart';
 
-class EventDetailsScreen extends StatelessWidget {
+class EventDetailsScreen extends StatefulWidget {
   static const routeName = '/event-details';
   final Event event;
 
   const EventDetailsScreen({super.key, required this.event});
 
+  @override
+  State<EventDetailsScreen> createState() => _EventDetailsScreenState();
+}
+
+class _EventDetailsScreenState extends State<EventDetailsScreen> {
+  final EventFavoritesRepository _favoritesRepository =
+      EventFavoritesRepository();
+  final InterestRepository _interestRepository = InterestRepository();
+  bool _favorite = false;
+
   static const _bodyStyle = TextStyle(color: Colors.white, fontSize: 15);
+
+  Event get event => widget.event;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFavorite();
+    if (event.category.isNotEmpty) {
+      unawaited(_interestRepository.trackCategoryView(event.category));
+    }
+  }
+
+  Future<void> _loadFavorite() async {
+    final eventId = event.id;
+    if (eventId == null || eventId.isEmpty) return;
+    final favorite = await _favoritesRepository.isFavorite(eventId);
+    if (!mounted) return;
+    setState(() => _favorite = favorite);
+  }
+
+  Future<void> _toggleFavorite() async {
+    final eventId = event.id;
+    if (eventId == null || eventId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This event cannot be favorited.')),
+      );
+      return;
+    }
+    final favorite = await _favoritesRepository.toggleFavorite(eventId);
+    if (!mounted) return;
+    setState(() => _favorite = favorite);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +80,16 @@ class EventDetailsScreen extends StatelessWidget {
         foregroundColor: Colors.white,
         centerTitle: true,
         title: const Text('Event details'),
+        actions: [
+          IconButton(
+            tooltip: _favorite ? 'Remove from favorites' : 'Add to favorites',
+            onPressed: _toggleFavorite,
+            icon: Icon(
+              _favorite ? Icons.favorite : Icons.favorite_border,
+              color: _favorite ? AppColors.accent : Colors.white,
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(

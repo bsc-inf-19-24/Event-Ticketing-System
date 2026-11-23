@@ -82,6 +82,42 @@ void main() {
     expect(find.text('No available events'), findsOneWidget);
     expect(find.text('ZaMusic Festival'), findsNothing);
   });
+
+  testWidgets('pulling down refreshes the Home event feed', (
+    WidgetTester tester,
+  ) async {
+    var requestCount = 0;
+    final eventApi = EventApi(
+      client: ApiClient(
+        baseUrl: 'https://api.test',
+        client: MockClient((request) async {
+          if (request.url.path == '/api/events') {
+            requestCount++;
+            return http.Response(
+              '[{"id":1,"name":"Sports event $requestCount","category":"Sports","status":"AVAILABLE"}]',
+              200,
+            );
+          }
+          return http.Response('[]', 200);
+        }),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(onViewTickets: _onViewTickets, eventApi: eventApi),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(requestCount, 1);
+    expect(find.text('Sports event 1'), findsOneWidget);
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, 500));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(requestCount, 2);
+    expect(find.text('Sports event 2'), findsOneWidget);
+  });
 }
 
 void _onViewTickets() {}

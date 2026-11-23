@@ -12,6 +12,7 @@ import '../../../features/orders/services/order_repository.dart';
 import '../../../features/tickets/logic/tickets_controller.dart';
 import '../../../models/event.dart';
 import '../../../models/ticket.dart';
+import '../../interests/data/interest_repository.dart';
 import '../models/payment_models.dart';
 import '../services/api_payment_service.dart';
 import '../services/fake_payment_service.dart';
@@ -57,6 +58,7 @@ class PaymentController extends ChangeNotifier {
   bool _pendingVerification = false;
   bool get isPendingVerification => _pendingVerification;
   final PendingCheckoutStore _pendingStore = PendingCheckoutStore();
+  final InterestRepository _interestRepository = InterestRepository();
   String? _paymentState;
   String? get paymentState => _paymentState;
 
@@ -256,7 +258,7 @@ class PaymentController extends ChangeNotifier {
         mockResult['status'],
       ]).toUpperCase();
       if (_isPaidStatus(status)) {
-        final paid = await _finishServerOrder(service, createdOrder);
+        final paid = await _finishServerOrder(service, createdOrder, event);
         if (paid) _clearIdempotencyState();
       } else if (const {
         'FAILED',
@@ -331,7 +333,7 @@ class PaymentController extends ChangeNotifier {
     try {
       final service = _paymentService;
       if (service is ApiPaymentService) {
-        final success = await _finishServerOrder(service, currentOrder);
+        final success = await _finishServerOrder(service, currentOrder, event);
         if (success) _clearIdempotencyState();
         return success;
       }
@@ -375,6 +377,9 @@ class PaymentController extends ChangeNotifier {
         buyerName: _buyerName,
         buyerEmail: _buyerEmail,
       );
+      if (event.category.isNotEmpty) {
+        await _interestRepository.trackCategoryPurchase(event.category);
+      }
       return true;
     } catch (error) {
       failureReason = error is ApiException
@@ -399,6 +404,7 @@ class PaymentController extends ChangeNotifier {
   Future<bool> _finishServerOrder(
     ApiPaymentService service,
     Order currentOrder,
+    Event event,
   ) async {
     final verification = await service.verifyOrder(currentOrder.id);
     final remoteOrder = _nestedMap(verification['order']);
@@ -435,6 +441,9 @@ class PaymentController extends ChangeNotifier {
       _paymentState = 'paid';
       _pendingVerification = false;
       await _pendingStore.clear(userId: _auth.stableUserId);
+      if (event.category.isNotEmpty) {
+        await _interestRepository.trackCategoryPurchase(event.category);
+      }
       return true;
     }
     if (const {'FAILED', 'FAILURE', 'CANCELLED', 'CANCELED'}.contains(status) ||

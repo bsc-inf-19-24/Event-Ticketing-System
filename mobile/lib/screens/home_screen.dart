@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../features/auth/logic/auth_controller.dart';
+import '../features/favorites/data/event_favorites_repository.dart';
+import '../features/interests/data/interest_repository.dart';
 import '../features/tickets/logic/tickets_controller.dart';
 import '../features/events/event_api.dart';
 import '../core/api_client.dart';
@@ -29,7 +33,13 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final List<String> categories = ['For you', 'Sports', 'Concerts', 'Workshop'];
+  final List<String> categories = [
+    'For you',
+    'Sports',
+    'Concerts',
+    'Workshop',
+    'Favorites',
+  ];
   String selectedCategory = 'For you';
   String searchQuery = '';
   late final EventApi _eventApi = widget.eventApi ?? EventApi();
@@ -37,6 +47,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loadingEvents = false;
   String? _eventsError;
   int _requestGeneration = 0;
+  late final InterestRepository _interestRepository = InterestRepository();
+  late final EventFavoritesRepository _favoritesRepository =
+      EventFavoritesRepository();
 
   @override
   void initState() {
@@ -44,19 +57,33 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadEvents();
   }
 
-  Future<void> _loadEvents() async {
+  Future<void> _loadEvents({bool showLoading = true}) async {
     final generation = ++_requestGeneration;
     setState(() {
-      _loadingEvents = true;
+      if (showLoading) _loadingEvents = true;
       _eventsError = null;
     });
     try {
       final events = await _eventApi.list(
-        category: selectedCategory == 'For you' ? null : selectedCategory,
+        category: const {'For you', 'Favorites'}.contains(selectedCategory)
+            ? null
+            : selectedCategory,
         search: searchQuery,
       );
       if (!mounted || generation != _requestGeneration) return;
-      setState(() => _remoteEvents = events);
+      var visibleEvents = events;
+      if (selectedCategory == 'Favorites') {
+        final favoriteIds = await _favoritesRepository.getFavoriteIds();
+        visibleEvents = events
+            .where(
+              (event) => event.id != null && favoriteIds.contains(event.id),
+            )
+            .toList();
+      } else if (selectedCategory == 'For you' && authController.isLoggedIn) {
+        visibleEvents = await _interestRepository.personalizeEvents(events);
+      }
+      if (!mounted || generation != _requestGeneration) return;
+      setState(() => _remoteEvents = visibleEvents);
     } catch (error) {
       if (!mounted || generation != _requestGeneration) return;
       setState(
@@ -71,6 +98,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _refreshEvents() => _loadEvents(showLoading: false);
+
   List<Event> get filteredEvents =>
       _remoteEvents.where((event) => event.isAvailable).toList();
 
@@ -81,119 +110,132 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(height: 16),
-                  const Text(
-                    'TICKET MASTER',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+        child: RefreshIndicator(
+          onRefresh: _refreshEvents,
+          color: AppColors.accent,
+          backgroundColor: AppColors.surface,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 16),
+                    const Text(
+                      'TICKET MASTER',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildWelcome(),
+                    if (authController.isLoggedIn) ...[
+                      const SizedBox(height: 12),
+                      _buildTicketsBanner(),
+                    ],
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              ),
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _HomeControlsHeaderDelegate(
+                  searchBar: _buildSearchBar(),
+                  categoryChips: _buildCategoryChips(),
+                ),
+              ),
+              if (_loadingEvents)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_eventsError != null)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _eventsError!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                        TextButton(
+                          onPressed: _loadEvents,
+                          child: const Text('Retry'),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  _buildWelcome(),
-                  if (authController.isLoggedIn) ...[
-                    const SizedBox(height: 12),
-                    _buildTicketsBanner(),
-                  ],
-                  const SizedBox(height: 16),
-                ],
-              ),
-            ),
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _HomeControlsHeaderDelegate(
-                searchBar: _buildSearchBar(),
-                categoryChips: _buildCategoryChips(),
-              ),
-            ),
-            if (_loadingEvents)
-              const SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_eventsError != null)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _eventsError!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white70),
-                      ),
-                      TextButton(
-                        onPressed: _loadEvents,
-                        child: const Text('Retry'),
-                      ),
-                    ],
+                )
+              else if (events.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: const Text(
+                      'No available events',
+                      style: TextStyle(color: Colors.white70),
+                    ),
                   ),
-                ),
-              )
-            else if (events.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(
-                  child: const Text(
-                    'No available events',
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                ),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    if (index.isOdd) {
-                      return const SizedBox(height: 16);
-                    }
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      if (index.isOdd) {
+                        return const SizedBox(height: 16);
+                      }
 
-                    final event = events[index ~/ 2];
-                    return EventCard(
-                      event: event,
-                      onTap: () async {
-                        var selectedEvent = event;
-                        final eventId = event.id;
-                        if (eventId != null && eventId.isNotEmpty) {
-                          try {
-                            selectedEvent = await _eventApi.details(eventId);
-                          } catch (error) {
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  error is ApiException ? error.message : 'Could not load ticket types. Please retry.',
-                                ),
+                      final event = events[index ~/ 2];
+                      return EventCard(
+                        event: event,
+                        onTap: () async {
+                          if (event.category.isNotEmpty) {
+                            unawaited(
+                              _interestRepository.trackCategoryView(
+                                event.category,
                               ),
                             );
                           }
-                        }
-                        if (!context.mounted) return;
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            settings: const RouteSettings(
-                              name: EventDetailsScreen.routeName,
+                          var selectedEvent = event;
+                          final eventId = event.id;
+                          if (eventId != null && eventId.isNotEmpty) {
+                            try {
+                              selectedEvent = await _eventApi.details(eventId);
+                            } catch (error) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    error is ApiException ? error.message : 'Could not load ticket types. Please retry.',
+                                  ),
+                                ),
+                              );
+                            }
+                          }
+                          if (!context.mounted) return;
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              settings: const RouteSettings(
+                                name: EventDetailsScreen.routeName,
+                              ),
+                              builder: (context) =>
+                                  EventDetailsScreen(event: selectedEvent),
                             ),
-                            builder: (context) =>
-                                EventDetailsScreen(event: selectedEvent),
-                          ),
-                        );
-                      },
-                    );
-                  }, childCount: events.length * 2 - 1),
+                          );
+                        },
+                      );
+                    }, childCount: events.length * 2 - 1),
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

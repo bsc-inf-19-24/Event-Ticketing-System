@@ -3,6 +3,11 @@ class ApiEndpoints {
   static const login = '/api/auth/login';
   static const refresh = '/api/auth/refresh';
   static const me = '/api/customers/me';
+  static const interests = '/api/interests';
+  static const myInterests = '/api/customers/me/interests';
+  static String myInterest(int interestId) =>
+      '/api/customers/me/interests/$interestId';
+  static const addMyInterest = '/api/customers/me/interests';
 
   static const events = '/api/events';
   static String event(String id) => '/api/events/$id';

@@ -13,6 +13,7 @@ import 'widgets/profile_menu_item.dart';
 import 'package:mobile/screens/settings_screen.dart';
 import 'package:mobile/screens/contact_us.dart';
 import 'package:mobile/screens/privacy_policy_screen.dart';
+import 'package:mobile/features/interests/ui/interests_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -215,6 +216,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 24.0),
 
                     // Menu List Items
+                    if ((authController.user?.role ?? '')
+                        .toUpperCase()
+                        .contains('CUSTOMER')) ...[
+                      ProfileMenuItem(
+                        title: 'My Interests',
+                        showChevron: true,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const InterestsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12.0),
+                    ],
                     ProfileMenuItem(
                       title: 'Settings',
                       showChevron:
