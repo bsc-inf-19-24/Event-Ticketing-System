@@ -140,7 +140,9 @@ class Ticket {
     required String authenticatedUserId,
     String? imageBaseUrl,
   }) {
-    final event = _nestedMap(json['event']);
+    final event = _nestedMap(
+      json['event'] ?? json['eventDetails'] ?? json['event_details'],
+    );
     final ticketTypeData = _nestedMap(
       json['ticketType'] ?? json['ticket_type'],
     );
@@ -187,11 +189,29 @@ class Ticket {
         json['date'],
         json['eventDate'],
         json['event_date'],
+        json['eventStartDate'],
+        json['event_start_date'],
+        json['eventDateTime'],
+        json['event_date_time'],
+        json['startDateTime'],
+        json['start_date_time'],
+        json['startTime'],
+        json['start_time'],
+        json['dateTime'],
+        json['date_time'],
         event['date'],
+        event['eventDate'],
+        event['event_date'],
         event['startsAt'],
         event['starts_at'],
         event['startDate'],
         event['start_date'],
+        event['startDateTime'],
+        event['start_date_time'],
+        event['startTime'],
+        event['start_time'],
+        event['dateTime'],
+        event['date_time'],
       ]),
       venue: _firstString([
         json['venue'],
@@ -226,7 +246,16 @@ class Ticket {
       price: _intValue([
         json['price'],
         json['amount'],
+        json['ticketPrice'],
+        json['ticket_price'],
+        json['ticketTypePrice'],
+        json['ticket_type_price'],
+        json['unitPrice'],
+        json['unit_price'],
+        json['pricePaid'],
+        json['price_paid'],
         ticketTypeData['price'],
+        ticketTypeData['amount'],
       ]),
       purchasedOn: _firstString([
         json['purchasedOn'],

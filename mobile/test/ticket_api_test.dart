@@ -54,6 +54,36 @@ void main() {
     expect(tickets.single.userId, 'customer-1');
   });
 
+  test('maps ticket-specific price and event start date fields', () async {
+    final client = MockClient((request) async {
+      return http.Response(
+        jsonEncode({
+          'data': [
+            {
+              'id': 'ticket-with-pricing',
+              'user_id': 'customer-1',
+              'status': 'issued',
+              'ticket_price': '25000',
+              'event_start_date': '2027-01-01T18:00:00Z',
+              'venue': 'Lilongwe',
+              'qr_code': 'ticket-qr',
+            },
+          ],
+        }),
+        200,
+      );
+    });
+    final api = TicketApi(
+      apiClient: ApiClient(baseUrl: 'https://tickets.example', client: client),
+      tokenProvider: () async => 'customer-token',
+    );
+
+    final tickets = await api.getMyTickets('customer-1');
+
+    expect(tickets.single.price, 25000);
+    expect(tickets.single.date, '2027-01-01T18:00:00Z');
+  });
+
   test("loads individual details and rejects another user's ticket", () async {
     final client = MockClient((request) async {
       expect(request.url.path, '/api/tickets/ticket-2');
