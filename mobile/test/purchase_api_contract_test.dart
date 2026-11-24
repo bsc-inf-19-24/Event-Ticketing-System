@@ -216,4 +216,24 @@ void main() {
     expect(ticket.source, 'server');
     expect(ticket.imagePath, 'http://localhost:8082/uploads/festival.jpg');
   });
+
+  test('ticket images map banner paths from the event record', () {
+    final ticket = Ticket.fromServer(
+      {
+        'id': 100,
+        'status': 'ISSUED',
+        'event': {
+          'name': 'Festival',
+          'banner_image_path': {'path': '/uploads/festival-banner.jpg'},
+        },
+      },
+      authenticatedUserId: 'customer-1',
+      imageBaseUrl: 'http://localhost:8082',
+    );
+
+    expect(
+      ticket.imagePath,
+      'http://localhost:8082/uploads/festival-banner.jpg',
+    );
+  });
 }
