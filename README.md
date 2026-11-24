@@ -9,9 +9,8 @@ The mobile application will allow customers to retrieve their purchased tickets,
 The project aims to make event ticket access more convenient, even when an internet connection is unavailable.
 
 ## Project Objectives
-
-- Allow customers to log in using their existing web application accounts.
-- Retrieve tickets purchased through the web application.
+-Browsing of events 
+- Buying of tickets 
 - Display ticket details, including event name, date, venue, and ticket status where available.
 - Allow customers to save purchased tickets for offline access.
 - Display the ticket's QR code or other official entry credential.
