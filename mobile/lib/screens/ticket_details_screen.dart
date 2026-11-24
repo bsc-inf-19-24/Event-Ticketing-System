@@ -217,39 +217,15 @@ class _TicketDetailsScreenState extends State<TicketDetailsScreen> {
                                 ),
                         ),
                         const SizedBox(height: 20),
-                        _TicketDetailRow(
-                          label: 'Event',
-                          value: _ticket.eventName,
-                        ),
-                        _TicketDetailRow(
-                          label: 'Ticket Type',
-                          value: _ticket.ticketType,
-                        ),
-                        _TicketDetailRow(label: 'Ticket ID', value: _ticket.id),
                         if (_ticket.buyerName.isNotEmpty ||
                             _ticket.buyerEmail.isNotEmpty)
                           _TicketHolderRow(
                             name: _ticket.buyerName,
                             email: _ticket.buyerEmail,
                           ),
-                        if (_ticket.paymentId.isNotEmpty)
-                          _TicketDetailRow(
-                            label: 'Payment ID',
-                            value: _ticket.paymentId,
-                            selectable: true,
-                          ),
-                        if (_ticket.orderId.isNotEmpty)
-                          _TicketDetailRow(
-                            label: 'Order ID',
-                            value: _ticket.orderId,
-                          ),
                         _TicketDetailRow(
                           label: 'User ID',
                           value: _ticket.userId,
-                        ),
-                        _TicketDetailRow(
-                          label: 'Payment ID',
-                          value: _ticket.paymentId,
                         ),
                         _TicketDetailRow(
                           label: 'Price',
