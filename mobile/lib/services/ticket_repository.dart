@@ -1,3 +1,4 @@
+import '../core/api_config.dart';
 import '../core/network/api_client.dart';
 import '../features/tickets/data/ticket_api.dart';
 import '../features/payment/services/api_payment_service.dart';
@@ -10,27 +11,42 @@ class TicketListResult {
   final Set<String> savedIds;
   final bool isOffline;
   final DateTime? lastSynced;
+  final String? refreshError;
 
   const TicketListResult({
     required this.tickets,
     required this.savedIds,
     required this.isOffline,
     this.lastSynced,
+    this.refreshError,
   });
 }
 
 class TicketRepository {
-  TicketRepository({TicketStorage? storage, TicketApi? api, this.ordersApi})
-    : _storage = storage ?? TicketStorage(),
-      _api =
-          api ??
-          (useFakeTickets
-              ? _configuredApi()
-              : TicketApi(apiClient: ApiClient.instance));
+  TicketRepository({
+    TicketStorage? storage,
+    TicketApi? api,
+    ApiClient? apiClient,
+    Future<String?> Function()? tokenProvider,
+    this.ordersApi,
+  }) : _storage = storage ?? TicketStorage(),
+       _api = api ?? _createApi(apiClient, tokenProvider);
 
   final TicketStorage _storage;
   final TicketApi? _api;
   final ApiPaymentService? ordersApi;
+
+  static TicketApi? _createApi(
+    ApiClient? apiClient,
+    Future<String?> Function()? tokenProvider,
+  ) {
+    if (apiClient != null) {
+      return TicketApi(apiClient: apiClient, tokenProvider: tokenProvider);
+    }
+    if (useFakeTickets && ApiConfig.useFakeAuth) return _configuredApi();
+    return _configuredApi() ??
+        TicketApi(apiClient: ApiClient.instance, tokenProvider: tokenProvider);
+  }
 
   static TicketApi? _configuredApi() {
     const baseUrl = String.fromEnvironment('API_BASE_URL');
@@ -49,14 +65,6 @@ class TicketRepository {
     if (hasConnection && api != null) {
       try {
         final remote = await api.getMyTickets(userId);
-        if (remote.isEmpty && cached.isNotEmpty) {
-          return TicketListResult(
-            tickets: cached.reversed.toList(),
-            savedIds: cached.map((ticket) => ticket.id).toSet(),
-            isOffline: true,
-            lastSynced: await _storage.getLastSynced(userId: userId),
-          );
-        }
         await _storage.synchronizeUserTickets(userId, remote);
         return TicketListResult(
           tickets: remote.reversed.toList(),
@@ -70,8 +78,9 @@ class TicketRepository {
         return TicketListResult(
           tickets: cached.reversed.toList(),
           savedIds: cached.map((ticket) => ticket.id).toSet(),
-          isOffline: true,
+          isOffline: !hasConnection,
           lastSynced: await _storage.getLastSynced(userId: userId),
+          refreshError: error.message,
         );
       }
     }
@@ -131,8 +140,9 @@ class TicketRepository {
         return TicketListResult(
           tickets: cached.reversed.toList(),
           savedIds: cached.map((ticket) => ticket.id).toSet(),
-          isOffline: true,
+          isOffline: !hasConnection,
           lastSynced: await _storage.getLastSynced(userId: userId),
+          refreshError: error.message,
         );
       }
     }

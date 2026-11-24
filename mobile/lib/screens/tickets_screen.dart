@@ -146,6 +146,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
           isSaved: true,
           isOffline: ticketsController.isOffline,
           onDownload: (_) async => true,
+          onRefresh: ticketsController.loadTicketDetails,
         ),
       ),
     );
@@ -280,17 +281,26 @@ class _TicketsScreenState extends State<TicketsScreen> {
         ),
       );
     }
+    final refreshError = ticketsController.errorMessage;
+    final showRefreshWarning =
+        !ticketsController.isOffline && refreshError != null;
+    final offlineItemCount = ticketsController.isOffline ? 1 : 0;
+    final warningItemCount = showRefreshWarning ? 1 : 0;
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
-        itemCount: tickets.length + (ticketsController.isOffline ? 1 : 0),
+        itemCount: tickets.length + offlineItemCount + warningItemCount,
         itemBuilder: (context, index) {
           if (ticketsController.isOffline && index == 0) {
             return const OfflineBanner();
           }
-          final ticketIndex = index - (ticketsController.isOffline ? 1 : 0);
+          final indexAfterOfflineBanner = index - offlineItemCount;
+          if (showRefreshWarning && indexAfterOfflineBanner == 0) {
+            return _TicketRefreshWarning(message: refreshError, onRetry: _load);
+          }
+          final ticketIndex = indexAfterOfflineBanner - warningItemCount;
           final ticket = tickets[ticketIndex];
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -303,6 +313,39 @@ class _TicketsScreenState extends State<TicketsScreen> {
       ),
     );
   }
+}
+
+class _TicketRefreshWarning extends StatelessWidget {
+  const _TicketRefreshWarning({required this.message, required this.onRetry});
+
+  final String? message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: Colors.white24),
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.sync_problem, color: Colors.white70, size: 20),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            message == null
+                ? 'Could not refresh tickets. Showing saved tickets.'
+                : 'Could not refresh tickets. Showing saved tickets. $message',
+            style: const TextStyle(color: Colors.white70, fontSize: 13),
+          ),
+        ),
+        TextButton(onPressed: onRetry, child: const Text('Retry')),
+      ],
+    ),
+  );
 }
 
 class _TicketCard extends StatelessWidget {

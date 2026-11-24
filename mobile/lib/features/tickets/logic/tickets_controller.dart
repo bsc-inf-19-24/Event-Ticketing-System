@@ -105,6 +105,7 @@ class TicketsController extends ChangeNotifier {
         _tickets = _dedupe(result.tickets);
         _isOffline = result.isOffline;
         _lastSynced = result.lastSynced;
+        _errorMessage = result.refreshError;
       }
     } on ApiException catch (error) {
       if (error.statusCode == 401) _auth.logOut();

@@ -320,7 +320,12 @@ class Ticket {
         payment['transactionId'],
         payment['transaction_id'],
       ]),
-      used: _boolValue([json['used'], json['isUsed'], json['is_used']]),
+      used: _boolValue([
+        json['used'],
+        json['isUsed'],
+        json['is_used'],
+        json['status'],
+      ]),
       orderId: _firstString([json['orderId'], json['order_id'], order['id']]),
       buyerName: _firstString([
         json['buyerName'],
@@ -418,12 +423,12 @@ String? ticketOwnerIdFromJson(Map<String, dynamic> json) {
     json['customer'] ?? json['user'] ?? json['owner'],
   );
   final owner = _firstString([
+    json['ownerId'],
+    json['owner_id'],
     json['userId'],
     json['user_id'],
     json['customerId'],
     json['customer_id'],
-    json['ownerId'],
-    json['owner_id'],
     customer['id'],
     customer['userId'],
     customer['user_id'],

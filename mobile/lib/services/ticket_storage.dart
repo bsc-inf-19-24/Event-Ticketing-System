@@ -301,7 +301,6 @@ class TicketStorage {
     if (remoteTickets.any((ticket) => ticket.userId != userId)) {
       throw StateError('Cannot cache tickets owned by another user.');
     }
-    if (remoteTickets.isEmpty) return;
     final now = DateTime.now().toIso8601String();
     final uniqueTickets = <String, Ticket>{
       for (final ticket in remoteTickets) ticket.id: ticket,

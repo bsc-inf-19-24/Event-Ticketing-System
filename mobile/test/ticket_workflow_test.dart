@@ -117,4 +117,126 @@ void main() {
     );
     expect(await storage.getSavedTickets(userId: 'user-a'), isEmpty);
   });
+
+  test(
+    'loads purchased tickets for a fresh device from ownerId responses',
+    () async {
+      final client = MockClient((request) async {
+        expect(request.url.path, '/api/tickets/my');
+        expect(request.headers['Authorization'], 'Bearer customer-token');
+        return http.Response(
+          jsonEncode([
+            {
+              'id': 42,
+              'ownerId': 8,
+              'status': 'VALID',
+              'paymentStatus': 'PAID',
+              'qrContent': 'signed-qr-content',
+            },
+          ]),
+          200,
+        );
+      });
+      final storage = TicketStorage(databasePath: ':memory:');
+      final repository = TicketRepository(
+        storage: storage,
+        apiClient: ApiClient(
+          baseUrl: 'https://tickets.example',
+          client: client,
+        ),
+        tokenProvider: () async => 'customer-token',
+      );
+
+      final result = await repository.load(userId: '8', hasConnection: true);
+
+      expect(result.isOffline, isFalse);
+      expect(result.tickets, hasLength(1));
+      expect(result.tickets.single.id, '42');
+      expect(result.tickets.single.qrPayload, 'signed-qr-content');
+      expect(await storage.getSavedTickets(userId: '8'), hasLength(1));
+      await storage.close();
+    },
+  );
+
+  test(
+    'successful empty ticket response replaces the saved ticket cache',
+    () async {
+      final storage = TicketStorage(databasePath: ':memory:');
+      await storage.saveTicket(
+        Ticket(
+          id: 'old-ticket',
+          userId: 'customer-1',
+          eventName: 'Old event',
+          date: '',
+          venue: '',
+          status: 'Issued',
+          qrData: 'old-qr',
+        ),
+      );
+      final repository = TicketRepository(
+        storage: storage,
+        api: TicketApi(
+          apiClient: ApiClient(
+            baseUrl: 'https://tickets.example',
+            client: MockClient((_) async => http.Response('[]', 200)),
+          ),
+          tokenProvider: () async => 'customer-token',
+        ),
+      );
+
+      final result = await repository.load(
+        userId: 'customer-1',
+        hasConnection: true,
+      );
+
+      expect(result.isOffline, isFalse);
+      expect(result.tickets, isEmpty);
+      expect(await storage.getSavedTickets(userId: 'customer-1'), isEmpty);
+      expect(await storage.getLastSynced(userId: 'customer-1'), isNotNull);
+      await storage.close();
+    },
+  );
+
+  test(
+    'reports server refresh failures without marking the device offline',
+    () async {
+      final storage = TicketStorage(databasePath: ':memory:');
+      await storage.saveTicket(
+        Ticket(
+          id: 'cached-ticket',
+          userId: 'online-user',
+          eventName: 'Saved event',
+          date: '',
+          venue: '',
+          status: 'Issued',
+          qrData: 'saved-qr',
+        ),
+      );
+      final repository = TicketRepository(
+        storage: storage,
+        api: TicketApi(
+          apiClient: ApiClient(
+            baseUrl: 'https://tickets.example',
+            client: MockClient(
+              (_) async => http.Response(
+                jsonEncode({'message': 'Ticket service is unavailable.'}),
+                502,
+              ),
+            ),
+          ),
+          tokenProvider: () async => 'customer-token',
+        ),
+      );
+
+      final result = await repository.load(
+        userId: 'online-user',
+        hasConnection: true,
+      );
+
+      expect(result.isOffline, isFalse);
+      expect(result.refreshError, 'Ticket service is unavailable.');
+      expect(result.tickets.single.id, 'cached-ticket');
+      await storage.close();
+    },
+  );
 }

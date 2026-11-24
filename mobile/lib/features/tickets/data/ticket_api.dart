@@ -21,11 +21,15 @@ class TicketApi {
     final tickets = <Ticket>[];
     final ids = <String>{};
     final qrPayloads = <String>{};
+    var rejectedTicket = false;
 
     for (final value in values) {
       final ticketData = _ticketMap(value);
       final ownerId = ticketOwnerIdFromJson(ticketData);
-      if (ownerId == null || ownerId != authenticatedUserId) continue;
+      if (ownerId == null || ownerId != authenticatedUserId) {
+        rejectedTicket = true;
+        continue;
+      }
       final ticket = _parseTicket(
         ticketData,
         authenticatedUserId: authenticatedUserId,
@@ -34,12 +38,21 @@ class TicketApi {
         throw ApiException('The server returned a ticket without an ID.');
       }
       if (ticket.userId != authenticatedUserId) continue;
-      if (!ticket.isIssued) continue;
+      if (!ticket.isIssued) {
+        rejectedTicket = true;
+        continue;
+      }
       if (!ids.add(ticket.id)) continue;
       if (ticket.qrPayload.isNotEmpty && !qrPayloads.add(ticket.qrPayload)) {
         throw ApiException('The server returned duplicate ticket QR data.');
       }
       tickets.add(ticket);
+    }
+
+    if (values.isNotEmpty && tickets.isEmpty && rejectedTicket) {
+      throw const ApiException(
+        'The server returned tickets, but none matched this account with a paid, issued status.',
+      );
     }
 
     return tickets;

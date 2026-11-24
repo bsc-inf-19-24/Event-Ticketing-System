@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/features/tickets/data/ticket_api.dart';
+import 'package:mobile/models/ticket.dart';
 
 void main() {
   test('loads issued tickets with the authenticated customer token', () async {
@@ -83,6 +84,108 @@ void main() {
     expect(tickets.single.price, 25000);
     expect(tickets.single.date, '2027-01-01T18:00:00Z');
   });
+
+  test('loads backend ownerId and paymentStatus ticket fields', () async {
+    final client = MockClient((request) async {
+      return http.Response(
+        jsonEncode([
+          {
+            'id': 42,
+            'userId': 'stale-user-id',
+            'ownerId': 8,
+            'status': 'VALID',
+            'paymentStatus': 'PAID',
+            'qrContent': 'signed-qr-content',
+            'event': {'name': 'Festival'},
+          },
+          {
+            'id': 43,
+            'ownerId': 9,
+            'status': 'VALID',
+            'paymentStatus': 'PAID',
+            'qrContent': 'another-owner-qr',
+          },
+          {
+            'id': 44,
+            'ownerId': 8,
+            'status': 'VALID',
+            'paymentStatus': 'PENDING',
+            'qrContent': 'unpaid-qr',
+          },
+          {
+            'id': 45,
+            'ownerId': 8,
+            'status': 'CANCELLED',
+            'paymentStatus': 'PAID',
+            'qrContent': 'cancelled-qr',
+          },
+        ]),
+        200,
+      );
+    });
+    final api = TicketApi(
+      apiClient: ApiClient(baseUrl: 'https://tickets.example', client: client),
+      tokenProvider: () async => 'customer-token',
+    );
+
+    final tickets = await api.getMyTickets('8');
+
+    expect(tickets, hasLength(1));
+    expect(tickets.single.id, '42');
+    expect(tickets.single.userId, '8');
+    expect(tickets.single.paymentStatus, 'PAID');
+    expect(tickets.single.qrPayload, 'signed-qr-content');
+  });
+
+  test('maps USED status to the ticket entry state', () {
+    final ticket = Ticket.fromApiJson({
+      'id': 42,
+      'ownerId': 8,
+      'status': 'USED',
+      'paymentStatus': 'PAID',
+      'qrContent': 'signed-qr-content',
+    }, authenticatedUserId: '8');
+
+    expect(ticket.used, isTrue);
+    expect(ticket.isIssued, isTrue);
+  });
+
+  test(
+    'surfaces non-empty responses with no matching issued tickets',
+    () async {
+      final api = TicketApi(
+        apiClient: ApiClient(
+          baseUrl: 'https://tickets.example',
+          client: MockClient(
+            (_) async => http.Response(
+              jsonEncode([
+                {
+                  'id': 42,
+                  'ownerId': 8,
+                  'status': 'VALID',
+                  'paymentStatus': 'PENDING',
+                  'qrContent': 'pending-qr',
+                },
+              ]),
+              200,
+            ),
+          ),
+        ),
+        tokenProvider: () async => 'customer-token',
+      );
+
+      await expectLater(
+        api.getMyTickets('8'),
+        throwsA(
+          isA<ApiException>().having(
+            (error) => error.message,
+            'message',
+            contains('none matched this account'),
+          ),
+        ),
+      );
+    },
+  );
 
   test("loads individual details and rejects another user's ticket", () async {
     final client = MockClient((request) async {
